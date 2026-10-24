@@ -1,0 +1,8 @@
+{
+  "corpus_size": 120,
+  "holdout_accuracy": 0.6667,
+  "holdout_macro_f1": 0.6441,
+  "cv5_macro_f1_mean": 0.5957,
+  "seed": 42,
+  "caveat": "All comments in the corpus were drafted by the same source, so the numbers measure how well the model fits that writer - not how well it reads a real student comment."
+}

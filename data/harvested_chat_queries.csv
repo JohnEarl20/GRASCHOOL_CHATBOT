@@ -1,0 +1,14 @@
+text,intent,source,date
+Can I enroll? I am a transferee and I have my TOR,check_eligibility,harvested from chat log,2026-10-22
+Can I enroll?,check_eligibility,harvested from chat log,2026-10-22
+Can I enroll? I am a freshman and I have my Form 138 and PSA,check_eligibility,harvested from chat log,2026-10-22
+I want to talk to a staff member,request_human,harvested from chat log,2026-10-22
+What do I need to enroll as a freshman?,ask_requirements,harvested from chat log,2026-10-22
+When is the payment deadline?,ask_schedule_deadline,harvested from chat log,2026-10-22
+What is the prerequisite of CS 201?,ask_course_prereq,harvested from chat log,2026-10-22
+hi po good morning,greet,harvested from chat log,2026-10-22
+office hours,ask_office_hours_location,harvested from chat log,2026-10-22
+enrollment requirements,ask_requirements,harvested from chat log,2026-10-22
+How much is the tuition fee and where do I pay?,ask_fees_payment,harvested from chat log,2026-10-22
+may swimming pool ba sa campus,ask_clearance_process,harvested from chat log,2026-10-22
+How much is the tuition fee?,ask_fees_payment,harvested from chat log,2026-10-22

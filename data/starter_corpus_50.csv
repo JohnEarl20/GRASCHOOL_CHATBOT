@@ -1,0 +1,51 @@
+id,text,intent,source,status
+S001,hello,greet,team-written draft (no real people),to be reviewed by Member B
+S002,hi po good morning,greet,team-written draft (no real people),to be reviewed by Member B
+S003,good afternoon po,greet,team-written draft (no real people),to be reviewed by Member B
+S004,"hey, may I ask something?",greet,team-written draft (no real people),to be reviewed by Member B
+S005,kumusta po,greet,team-written draft (no real people),to be reviewed by Member B
+S006,What documents do I need to enroll as a freshman?,ask_requirements,team-written draft (no real people),to be reviewed by Member B
+S007,ano po ang requirements for transferee?,ask_requirements,team-written draft (no real people),to be reviewed by Member B
+S008,What do I need to bring to the registrar for enrollment?,ask_requirements,team-written draft (no real people),to be reviewed by Member B
+S009,Requirements for returning students po?,ask_requirements,team-written draft (no real people),to be reviewed by Member B
+S010,Do I need a PSA birth certificate to enroll?,ask_requirements,team-written draft (no real people),to be reviewed by Member B
+S011,Can I enroll now? I am a transferee and I have my TOR,check_eligibility,team-written draft (no real people),to be reviewed by Member B
+S012,"I'm a freshman, I already have Form 138 and PSA, am I ready to enroll?",check_eligibility,team-written draft (no real people),to be reviewed by Member B
+S013,Am I eligible to enroll as a returning student?,check_eligibility,team-written draft (no real people),to be reviewed by Member B
+S014,Check if my documents are complete,check_eligibility,team-written draft (no real people),to be reviewed by Member B
+S015,"pwede na ba ako mag-enroll, wala pa akong clearance",check_eligibility,team-written draft (no real people),to be reviewed by Member B
+S016,When is the last day of enrollment?,ask_schedule_deadline,team-written draft (no real people),to be reviewed by Member B
+S017,What is the schedule for late enrollment?,ask_schedule_deadline,team-written draft (no real people),to be reviewed by Member B
+S018,Kailan ang start ng classes this semester?,ask_schedule_deadline,team-written draft (no real people),to be reviewed by Member B
+S019,When is the deadline for adding and dropping subjects?,ask_schedule_deadline,team-written draft (no real people),to be reviewed by Member B
+S020,What date is the payment of fees?,ask_schedule_deadline,team-written draft (no real people),to be reviewed by Member B
+S021,How much is the tuition for a BSCS student?,ask_fees_payment,team-written draft (no real people),to be reviewed by Member B
+S022,Where do I pay my assessment?,ask_fees_payment,team-written draft (no real people),to be reviewed by Member B
+S023,Pwede po ba installment ang payment?,ask_fees_payment,team-written draft (no real people),to be reviewed by Member B
+S024,What are the payment options at the cashier?,ask_fees_payment,team-written draft (no real people),to be reviewed by Member B
+S025,Magkano ang miscellaneous fee?,ask_fees_payment,team-written draft (no real people),to be reviewed by Member B
+S026,What time does the registrar open?,ask_office_hours_location,team-written draft (no real people),to be reviewed by Member B
+S027,Where is the library located?,ask_office_hours_location,team-written draft (no real people),to be reviewed by Member B
+S028,Anong oras po ang office hours ng guidance office?,ask_office_hours_location,team-written draft (no real people),to be reviewed by Member B
+S029,Saan ang registrar's office?,ask_office_hours_location,team-written draft (no real people),to be reviewed by Member B
+S030,Is the registrar open on Saturday?,ask_office_hours_location,team-written draft (no real people),to be reviewed by Member B
+S031,What is the prerequisite of CS 201?,ask_course_prereq,team-written draft (no real people),to be reviewed by Member B
+S032,Can I take Data Structures if I haven't passed Programming 1?,ask_course_prereq,team-written draft (no real people),to be reviewed by Member B
+S033,anong prerequisite ng CS ELEC 6?,ask_course_prereq,team-written draft (no real people),to be reviewed by Member B
+S034,Which subjects should I take in 2nd year first semester?,ask_course_prereq,team-written draft (no real people),to be reviewed by Member B
+S035,How many units can I take this semester?,ask_course_prereq,team-written draft (no real people),to be reviewed by Member B
+S036,How do I get my clearance?,ask_clearance_process,team-written draft (no real people),to be reviewed by Member B
+S037,What are the steps to get a clearance for graduation?,ask_clearance_process,team-written draft (no real people),to be reviewed by Member B
+S038,Ano po ang process ng clearance sa library?,ask_clearance_process,team-written draft (no real people),to be reviewed by Member B
+S039,Who signs the clearance form?,ask_clearance_process,team-written draft (no real people),to be reviewed by Member B
+S040,Do I need clearance before enrolling again?,ask_clearance_process,team-written draft (no real people),to be reviewed by Member B
+S041,I want to talk to a staff member,request_human,team-written draft (no real people),to be reviewed by Member B
+S042,Pakausap po sa registrar staff,request_human,team-written draft (no real people),to be reviewed by Member B
+S043,Can you connect me to a real person?,request_human,team-written draft (no real people),to be reviewed by Member B
+S044,human agent please,request_human,team-written draft (no real people),to be reviewed by Member B
+S045,I need help from the office directly,request_human,team-written draft (no real people),to be reviewed by Member B
+S046,"Thanks, that was very helpful!",give_feedback,team-written draft (no real people),to be reviewed by Member B
+S047,"The answer was wrong, I wasted my time",give_feedback,team-written draft (no real people),to be reviewed by Member B
+S048,"Ang bilis ng sagot, salamat po",give_feedback,team-written draft (no real people),to be reviewed by Member B
+S049,This is confusing and not useful,give_feedback,team-written draft (no real people),to be reviewed by Member B
+S050,"Great assistant, easy to use",give_feedback,team-written draft (no real people),to be reviewed by Member B

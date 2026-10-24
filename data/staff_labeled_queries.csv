@@ -1,0 +1,4 @@
+text,intent,source,date
+Is the office open during the foundation day,check_eligibility,staff-labelled in the dashboard,2026-10-22
+Do you accept the new portal for the assessment,check_eligibility,staff-labelled in the dashboard,2026-10-22
+Can I pay using GCash on the weekend,check_eligibility,staff-labelled in the dashboard,2026-10-22
