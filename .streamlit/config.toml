@@ -1,0 +1,22 @@
+# Streamlit theme for the Cognitive Campus Assistant.
+# The tokens here are the ones the CSS in app.py also uses, so the framework
+# chrome and the custom cards stay in the same colour system.
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+# The Streamlit overflow menu (Rerun / Settings / Print / Record / Developer
+# options / Clear cache) is developer chrome, not part of this app, and it
+# renders on a light surface that cannot be recoloured reliably. Hide it.
+toolbarMode = "minimal"
+
+[theme]
+base = "light"
+primaryColor = "#1E40AF"
+backgroundColor = "#EFF6FF"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1E3A8A"
+font = "sans serif"

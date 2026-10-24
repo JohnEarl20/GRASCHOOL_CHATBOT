@@ -1,0 +1,301 @@
+id,text,intent,source,status
+S051,hello there,greet,AI-drafted draft (no real people),to be replaced by Member B
+S052,hi good day,greet,AI-drafted draft (no real people),to be replaced by Member B
+S053,good morning po,greet,AI-drafted draft (no real people),to be replaced by Member B
+S054,good afternoon,greet,AI-drafted draft (no real people),to be replaced by Member B
+S055,good evening sir,greet,AI-drafted draft (no real people),to be replaced by Member B
+S056,magandang umaga po,greet,AI-drafted draft (no real people),to be replaced by Member B
+S057,magandang gabi,greet,AI-drafted draft (no real people),to be replaced by Member B
+S058,kumusta ka po,greet,AI-drafted draft (no real people),to be replaced by Member B
+S059,kamusta na,greet,AI-drafted draft (no real people),to be replaced by Member B
+S060,hey there,greet,AI-drafted draft (no real people),to be replaced by Member B
+S061,hi anyone,greet,AI-drafted draft (no real people),to be replaced by Member B
+S062,hello assistant,greet,AI-drafted draft (no real people),to be replaced by Member B
+S063,is this the registrar chatbot,greet,AI-drafted draft (no real people),to be replaced by Member B
+S064,hi i need help,greet,AI-drafted draft (no real people),to be replaced by Member B
+S065,hello i have a question,greet,AI-drafted draft (no real people),to be replaced by Member B
+S066,hello po ka ba,greet,AI-drafted draft (no real people),to be replaced by Member B
+S067,magandang hatinggabi,greet,AI-drafted draft (no real people),to be replaced by Member B
+S068,good day po madam,greet,AI-drafted draft (no real people),to be replaced by Member B
+S069,hey good afternoon po,greet,AI-drafted draft (no real people),to be replaced by Member B
+S070,hi can you help me,greet,AI-drafted draft (no real people),to be replaced by Member B
+S071,hello i am a student,greet,AI-drafted draft (no real people),to be replaced by Member B
+S072,good afternoon po sir,greet,AI-drafted draft (no real people),to be replaced by Member B
+S073,hello po,greet,AI-drafted draft (no real people),to be replaced by Member B
+S074,morning po,greet,AI-drafted draft (no real people),to be replaced by Member B
+S075,how are you po,greet,AI-drafted draft (no real people),to be replaced by Member B
+S076,good eve,greet,AI-drafted draft (no real people),to be replaced by Member B
+S077,hi welcome,greet,AI-drafted draft (no real people),to be replaced by Member B
+S078,hello student,greet,AI-drafted draft (no real people),to be replaced by Member B
+S079,hi registrar,greet,AI-drafted draft (no real people),to be replaced by Member B
+S080,good morning everyone,greet,AI-drafted draft (no real people),to be replaced by Member B
+S081,what do i need to enroll as a freshman,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S082,what are the requirements for transferee students,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S083,ano po ang requirements ko,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S084,what documents should i bring to the registrar,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S085,list of requirements for returning students,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S086,what paperwork is needed for enrollment,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S087,freshmen requirements po,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S088,what do returning students need to submit,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S089,anong mga dokumento ang kailangan,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S090,what are the enrollment requirements this term,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S091,do i need a birth certificate to enroll,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S092,is tor needed for transferee,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S093,what is an honorable dismissal,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S094,requirements for enrolling as a new student,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S095,what should i prepare before going to the registrar,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S096,ano ang kailangan para mag enroll,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S097,complete requirements for a first year student,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S098,what are the documents for the registrar,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S099,how many documents do i need to submit,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S100,is clearance a requirement for enrollment,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S101,what does a transferee need to enroll,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S102,baka may ibang requirements para sa returning,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S103,tell me the enrollment checklist,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S104,what papers are needed po,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S105,requirements for a new student in this school,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S106,what does the school require from new students,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S107,i want to know the requirements first,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S108,ano ang requirements ko kung returning student ako,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S109,requirements to enroll po please,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S110,what are the basic enrollment requirements,ask_requirements,AI-drafted draft (no real people),to be replaced by Member B
+S111,can i enroll now,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S112,pwede na ba ako mag enroll,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S113,am i eligible to enroll this term,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S114,check my documents please,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S115,i am a transferee and i have my tor,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S116,i am a freshman with form138 and psa,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S117,am i ready to enroll,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S118,can i officially enroll yet,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S119,eligible ba ako,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S120,i have all my documents can i enroll,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S121,check eligibility po,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S122,am i complete for enrollment,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S123,i am a returning student without clearance,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S124,i paid my fees am i good to enroll,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S125,can you check if i can enroll,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S126,baka puwede na ako mag enlist,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S127,is my enrollment complete,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S128,check if i am ready for official enrollment,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S129,magaling na ba ako mag enroll,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S130,i want to enroll officially today,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S131,can i proceed with enrollment,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S132,i have tor and honorable dismissal am i ok,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S133,check ko po kung eligible ako,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S134,am i allowed to enroll this semester,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S135,i still need to submit a document can i enroll,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S136,is everything complete on my side,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S137,do i pass the enrollment requirements,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S138,pwede na ba mag official enrollment,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S139,tell me if i can enroll or not,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S140,check if my documents are complete,check_eligibility,AI-drafted draft (no real people),to be replaced by Member B
+S141,when is the last day of enrollment,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S142,kailan magbubukas ang enrollment,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S143,what is the enrollment schedule,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S144,when do classes start,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S145,anong araw ang deadline ng payment,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S146,when is the add drop deadline,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S147,what is the schedule for late enrollment,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S148,kailan po mag start ang klase,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S149,list of all deadlines this term,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S150,when is the deadline for the scholarship application,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S151,kailan magbukas ang second semester,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S152,when does the payment deadline end,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S153,anong oras po ang enrollment schedule,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S154,what are the important dates for enrollment,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S155,when is the last day to submit requirements,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S156,start and end date of this semester,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S157,kailan ang enrollment period,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S158,how many days left to enroll,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S159,what is the academic calendar,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S160,when is the next batch of enrollment,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S161,until when can i enroll,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S162,deadline for the add drop period po,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S163,when does the university break start,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S164,anong petsa ang enrollment,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S165,schedule of the enrollment for bsit,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S166,what is the effectivity date of the forms,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S167,when do the payment of fees start,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S168,last day of the official enrollment period,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S169,bago mag enroll anong deadline,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S170,when is the orientation,ask_schedule_deadline,AI-drafted draft (no real people),to be replaced by Member B
+S171,how much is the tuition fee,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S172,where do i pay the assessment,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S173,saan mag bayad ng assessment,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S174,what are the payment options,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S175,pwede po ba installment ang payment,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S176,magkano ang miscellaneous fee,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S177,what is the total assessment for bsit,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S178,where can i pay the fees,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S179,is there a payment deadline,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S180,paano magbayad ng fees online,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S181,do i pay before or after enrolling,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S182,what fees do i need to pay for enrollment,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S183,how do i pay through the online portal,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S184,magkano po ang tuition,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S185,is laboratory fee separate,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S186,what happens if i miss the payment deadline,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S187,baka may discount para sa scholars,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S188,how do i apply for a scholarship,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S189,what is the down payment,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S190,can i pay in two installments,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S191,where is the cashier office,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S192,do i need a receipt for payment,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S193,how much is the laboratory fee for bsit,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S194,what is included in the assessment fee,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S195,anong bayad ang kailangan,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S196,can i use a different payment method,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S197,how do i request for a refund,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S198,what is the fee for the change of subject,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S199,pwede ba mag gcash,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S200,what is the price per unit,ask_fees_payment,AI-drafted draft (no real people),to be replaced by Member B
+S201,what time does the registrar open,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S202,saan ang registrar office,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S203,where is the library located,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S204,anong oras po ang office hours ng guidance,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S205,is the registrar open on saturday,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S206,where is the cashier office,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S207,opening hours of the registrar,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S208,baka may lunch break ang registrar,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S209,where can i find the guidance office,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S210,what are the office hours of the accounting office,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S211,where is the student services office,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S212,what time does the library close,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S213,saan po ang registrar,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S214,how do i get to the registrar office,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S215,does the registrar open during holidays,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S216,location of the main building,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S217,where is the laboratory for bsit,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S218,anong araw po ang open ang registrar,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S219,what are the office hours of the osa,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S220,where do i go to submit my requirements,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S221,is the cashier open on friday,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S222,where is the clinic,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S223,anong oras ang close ng library,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S224,tell me the location of the registrar,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S225,do they have a helpdesk,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S226,where can i ask about my enrollment,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S227,what floor is the registrar on,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S228,baka sabi nila open ng 8,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S229,is the library open on weekends,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S230,office hours for student affairs,ask_office_hours_location,AI-drafted draft (no real people),to be replaced by Member B
+S231,what is the prerequisite of cs 201,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S232,anong prerequisite ng cs elec 6,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S233,can i take data structures without programming 1,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S234,how many units can i take this semester,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S235,what subjects should i take in 2nd year,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S236,what are the prerequisites for programming 2,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S237,list all cs courses and their prerequisites,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S238,is calculus a prerequisite for physics,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S239,how many units is a lab subject,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S240,what is the difference between bsit and bscs,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S241,which course is offered this semester,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S242,ano ang mga subject sa third year,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S243,what is the prerequisite for cs e 6,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S244,can i shift to another program,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S245,what is the total units of the program,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S246,what subjects are required for the degree,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S247,how do i know if i qualify for the course,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S248,may prerequisite ba ang cs 201,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S249,what is a laboratory course,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S250,baka required ang econ 1,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S251,how many subjects per semester is ideal,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S252,what is the course outline for programming 1,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S253,do i need to pass all prerequisites first,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S254,anong subject ang pwede kong gawin na,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S255,which courses have laboratory,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S256,how is the load computed,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S257,what is the credit of the laboratory subject,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S258,do i take the course if i failed the prerequisite,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S259,list the curriculum of bscs,ask_course_prereq,AI-drafted draft (no real people),to be replaced by Member B
+S260,how do i get my clearance,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S261,ano po ang process ng clearance,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S262,what are the steps to get a clearance,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S263,do i need clearance before enrolling again,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S264,who signs the clearance form,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S265,clearance for a graduating student,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S266,paano mag clear,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S267,what do i need for the library clearance,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S268,is clearance required for freshmen,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S269,how long does the clearance process take,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S270,baka may utang na ako,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S271,what is the clearance form,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S272,where do i get the clearance form,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S273,does the cashier release the clearance,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S274,what happens after the clearance is signed,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S275,clearance sa guidance office po,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S276,do i clear before or after enrollment,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S277,how many signatures for the clearance,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S278,is the laboratory clearance needed,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S279,paano kumukuha ng clearance,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S280,what is the deadline for the clearance,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S281,do i need to clear first before paying,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S282,baka sabi ng guidance na may bayad,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S283,is the clearance valid for one term only,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S284,what do i bring to the clearance,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S285,clearance for transferee students,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S286,is there a laboratory clearance for bsit,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S287,paano magpasa ng clearance,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S288,what is the requirement for financial clearance,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S289,how does the guidance office clear students,ask_clearance_process,AI-drafted draft (no real people),to be replaced by Member B
+S290,i want to talk to a staff member,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S291,pakausap po sa registrar staff,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S292,can you connect me to a real person,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S293,human agent please,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S294,i need help from the office directly,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S295,let me talk to the registrar,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S296,gusto ko pong makausap ng tao,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S297,connect me to someone please,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S298,i prefer to speak with a person,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S299,baka kausapin ko yung staff,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S300,is there a real person available,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S301,please transfer me to a human,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S302,talk to someone po,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S303,i want the office staff not the bot,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S304,can i speak with the registrar now,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S305,human please,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S306,gusto ko ng totoong tao,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S307,please put me through to a staff member,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S308,pwede bang makausap ng registrar,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S309,i need to talk to the guidance office,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S310,let me talk to the office,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S311,connect me to the cashier please,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S312,i want a real person to answer my question,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S313,baka bot na lang ito,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S314,human agent na po please,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S315,can a staff person assist me,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S316,i need a person to explain this,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S317,tulong ng tao po,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S318,switch to a real staff member,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S319,please let me talk to someone,request_human,AI-drafted draft (no real people),to be replaced by Member B
+S320,thanks that was helpful,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S321,ang bilis ng sagot salamat po,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S322,the answer was wrong i wasted my time,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S323,this is confusing and not useful,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S324,great assistant easy to use,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S325,salamat po sa tulong,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S326,that was not what i asked,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S327,very helpful thanks a lot,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S328,unhelpful answer please fix it,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S329,maganda naman ito,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S330,i am confused by the response,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S331,perfect answer thank you,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S332,your answer is wrong,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S333,good job registrar bot,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S334,unhelpful po,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S335,this answer is incorrect,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S336,tnx very helpful,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S337,i dont understand this explanation,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S338,nice thanks,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S339,bad experience today,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S340,answer was very useful thanks,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S341,wrong information,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S342,very easy to use thank you,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S343,ang ganda ng sagot,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S344,misleading response,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S345,thank you so much po,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S346,the instructions were confusing,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S347,unhelpful and inaccurate,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S348,nice one thanks,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S349,your answer did not make sense,give_feedback,AI-drafted draft (no real people),to be replaced by Member B
+S350,mabuting serbisyo po,give_feedback,AI-drafted draft (no real people),to be replaced by Member B

@@ -1,0 +1,375 @@
+{
+  "meta": {
+    "school": "GRA SCHOOL - Registrar's Office",
+    "term": "AY 2026-2027, First Semester",
+    "status": "DRAFT",
+    "warning": "Every record in this file is a team-written placeholder. Amounts, dates and hours are NOT taken from an announcement and MUST be verified against the actual handbook and posted announcements before the defense.",
+    "source_note": "Sources are public pages, the handbook and posted announcements; each record below carries a 'source' field naming what it still needs.",
+    "updated": "2026-10-22"
+  },
+  "student_types": [
+    {
+      "id": "freshman",
+      "name": "Freshman",
+      "label": "Freshman (new / first year student)",
+      "aliases": ["freshman", "freshmen", "first year", "new student", "bagong student"],
+      "rule_ids": ["R1", "R2"],
+      "source": "DRAFT - confirm the freshman list in the handbook"
+    },
+    {
+      "id": "transferee",
+      "name": "Transferee",
+      "label": "Transferee (student with a previous school)",
+      "aliases": ["transferee", "transferees", "transfer student"],
+      "rule_ids": ["R3", "R4"],
+      "source": "DRAFT - confirm the transferee list in the handbook"
+    },
+    {
+      "id": "returning",
+      "name": "Returning student",
+      "label": "Returning student (re-enrolling)",
+      "aliases": ["returning", "returning student", "returnee", "old student"],
+      "rule_ids": ["R5"],
+      "source": "DRAFT - confirm the returning-student list in the handbook"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "form138",
+      "name": "Form 138 (School Record)",
+      "applies_to": ["freshman"],
+      "issuing_body": "Registrar's Office",
+      "description": "Official school record showing the subject and grade history of the student.",
+      "source": "DRAFT - handbook section to be confirmed"
+    },
+    {
+      "id": "psa_birth_certificate",
+      "name": "PSA Birth Certificate",
+      "applies_to": ["freshman"],
+      "issuing_body": "PSA (issued copy) or a Certified True Copy",
+      "description": "Original PSA birth certificate issued by PSA, or a photocopy of the original plus a photocopy of the student's ID.",
+      "source": "DRAFT - handbook section to be confirmed"
+    },
+    {
+      "id": "tor",
+      "name": "TOR (Transcript of Records)",
+      "applies_to": ["transferee"],
+      "issuing_body": "Previous school / CHED",
+      "description": "Transcript of Records with the original signature of the registrar, plus a copy of the transcript of grades if the school uses one.",
+      "source": "DRAFT - handbook section to be confirmed"
+    },
+    {
+      "id": "honorable_dismissal",
+      "name": "Honorable Dismissal",
+      "applies_to": ["transferee"],
+      "issuing_body": "Previous school registrar",
+      "description": "Certificate of good moral character issued by the previous school, stating that the student left in good standing.",
+      "source": "DRAFT - handbook section to be confirmed"
+    },
+    {
+      "id": "clearance",
+      "name": "Clearance",
+      "applies_to": ["returning"],
+      "issuing_body": "Guidance Office, Cashier's Office, Library",
+      "description": "Signed clearance from the offices that hold the student's accountabilities (guidance, cashier, library).",
+      "source": "DRAFT - handbook section to be confirmed"
+    }
+  ],
+  "services": [
+    {
+      "id": "enrollment",
+      "name": "Official enrollment",
+      "needed_for": ["freshman", "transferee", "returning"],
+      "provided_by": "registrar",
+      "online_or_window": "window",
+      "steps": [
+        "Present the requirements listed for your student type.",
+        "Take a queue number at the Registrar's Office.",
+        "Sign the enrollment form and receive your assessment.",
+        "Pay the assessment at the Cashier's Office before the deadline.",
+        "Submit your class assignment slip / adviser schedule."
+      ],
+      "source": "DRAFT - walkthrough to be confirmed with the Registrar"
+    },
+    {
+      "id": "clearance",
+      "name": "Student clearance",
+      "needed_for": ["returning"],
+      "provided_by": "guidance",
+      "online_or_window": "window",
+      "steps": [
+        "Go to the Guidance Office and request the clearance form.",
+        "Pay any outstanding accountabilities at the Cashier's Office and attach the receipt.",
+        "Settle library and laboratory accountabilities.",
+        "Have the Guidance Office sign and release the clearance.",
+        "Bring the released clearance to the Registrar's Office."
+      ],
+      "source": "DRAFT - clearance route to be confirmed with the Guidance Office"
+    },
+    {
+      "id": "payment",
+      "name": "Payment of assessment fees",
+      "needed_for": ["freshman", "transferee", "returning"],
+      "provided_by": "cashier",
+      "online_or_window": "both",
+      "steps": [
+        "Get your assessment from the Registrar's Office or the student portal.",
+        "Pay at the Cashier's Office or through the online portal.",
+        "Keep the official receipt - the Registrar will ask for it."
+      ],
+      "source": "DRAFT - payment channels to be confirmed with the Cashier"
+    },
+    {
+      "id": "scholarship",
+      "name": "Scholarship application",
+      "needed_for": ["freshman", "transferee", "returning"],
+      "provided_by": "osa",
+      "online_or_window": "window",
+      "steps": [
+        "Get the application form from the Office of Student Affairs.",
+        "Attach the required documents and your Form 138.",
+        "Submit before the scholarship deadline and wait for the release of results."
+      ],
+      "source": "DRAFT - scholarship window to be confirmed"
+    },
+    {
+      "id": "late_enrollment",
+      "name": "Late enrollment",
+      "needed_for": ["freshman", "transferee", "returning"],
+      "provided_by": "registrar",
+      "online_or_window": "window",
+      "steps": [
+        "Ask the Registrar's Office for the late enrollment form.",
+        "Explain the reason and attach proof.",
+        "Pay the late fee if the registrar approves the request."
+      ],
+      "source": "DRAFT - late enrolment policy to be confirmed"
+    }
+  ],
+  "offices": [
+    {
+      "id": "registrar",
+      "name": "Registrar's Office",
+      "location": "Main Building, Room 101",
+      "hours": "Monday to Friday, 8:00 AM to 12:00 PM and 1:00 PM to 5:00 PM",
+      "window": "Room 101",
+      "handles": ["enrollment", "assessment", "student records"],
+      "source": "DRAFT - hours to be confirmed against the posted schedule"
+    },
+    {
+      "id": "cashier",
+      "name": "Cashier's Office",
+      "location": "Main Building, Room 105",
+      "hours": "Monday to Friday, 8:00 AM to 3:00 PM",
+      "window": "Room 105",
+      "handles": ["payment", "clearance"],
+      "source": "DRAFT - hours to be confirmed against the posted schedule"
+    },
+    {
+      "id": "guidance",
+      "name": "Guidance Office",
+      "location": "Main Building, Room 203",
+      "hours": "Monday to Friday, 9:00 AM to 4:00 PM",
+      "window": "Room 203",
+      "handles": ["clearance", "scholarship"],
+      "source": "DRAFT - hours to be confirmed against the posted schedule"
+    },
+    {
+      "id": "library",
+      "name": "University Library",
+      "location": "Main Building, 2nd Floor",
+      "hours": "Monday to Friday, 7:30 AM to 5:30 PM",
+      "window": "2nd Floor",
+      "handles": ["clearance"],
+      "source": "DRAFT - hours to be confirmed against the posted schedule"
+    },
+    {
+      "id": "osa",
+      "name": "Office of Student Affairs",
+      "location": "Ground Floor, Student Center",
+      "hours": "Monday to Friday, 8:00 AM to 5:00 PM",
+      "window": "Student Center",
+      "handles": ["scholarship", "student activities"],
+      "source": "DRAFT - hours to be confirmed against the posted schedule"
+    }
+  ],
+  "courses": [
+    {
+      "code": "CS 101",
+      "title": "Introduction to Programming 1",
+      "units": 3,
+      "prerequisites": [],
+      "part_of": "BSCS",
+      "offered_in": ["1st semester", "2nd semester"],
+      "laboratory": true,
+      "source": "DRAFT - course catalogue entry to be confirmed"
+    },
+    {
+      "code": "CS 102",
+      "title": "Programming 2",
+      "units": 3,
+      "prerequisites": ["CS 101"],
+      "part_of": "BSCS",
+      "offered_in": ["1st semester", "2nd semester"],
+      "laboratory": true,
+      "source": "DRAFT - course catalogue entry to be confirmed"
+    },
+    {
+      "code": "CS 201",
+      "title": "Data Structures and Algorithms",
+      "units": 3,
+      "prerequisites": ["CS 102"],
+      "part_of": "BSCS",
+      "offered_in": ["1st semester", "2nd semester"],
+      "laboratory": true,
+      "source": "DRAFT - course catalogue entry to be confirmed"
+    },
+    {
+      "code": "CS 202",
+      "title": "Discrete Structures",
+      "units": 3,
+      "prerequisites": ["CS 101"],
+      "part_of": "BSCS",
+      "offered_in": ["2nd semester"],
+      "laboratory": false,
+      "source": "DRAFT - course catalogue entry to be confirmed"
+    },
+    {
+      "code": "CS ELEC 6",
+      "title": "Cloud Computing",
+      "units": 3,
+      "prerequisites": [],
+      "part_of": "BSCS",
+      "offered_in": ["2nd semester"],
+      "laboratory": true,
+      "source": "DRAFT - elective offering to be confirmed"
+    }
+  ],
+  "programs": [
+    {
+      "code": "BSCS",
+      "name": "Bachelor of Science in Computer Science",
+      "max_units": 144,
+      "source": "DRAFT - total units to be confirmed"
+    },
+    {
+      "code": "BSIT",
+      "name": "Bachelor of Science in Information Technology",
+      "max_units": 144,
+      "source": "DRAFT - total units to be confirmed"
+    }
+  ],
+  "semesters": [
+    {
+      "name": "1st semester",
+      "term": "AY 2026-2027",
+      "start_date": "2026-08-17",
+      "end_date": "2026-12-19",
+      "source": "DRAFT - calendar to be confirmed"
+    },
+    {
+      "name": "2nd semester",
+      "term": "AY 2026-2027",
+      "start_date": "2027-01-11",
+      "end_date": "2027-05-15",
+      "source": "DRAFT - calendar to be confirmed"
+    }
+  ],
+  "deadlines": [
+    {
+      "label": "Enrollment period (2nd semester)",
+      "date": "2026-11-09 to 2026-11-20",
+      "confirmed": false,
+      "applies_to": ["freshman", "transferee", "returning"],
+      "source": "DRAFT - placeholder date, confirm against the posted announcement"
+    },
+    {
+      "label": "Assessment payment deadline",
+      "date": "2026-11-20",
+      "confirmed": false,
+      "applies_to": ["freshman", "transferee", "returning"],
+      "source": "DRAFT - placeholder date, confirm against the posted announcement"
+    },
+    {
+      "label": "Classes start (2nd semester)",
+      "date": "2026-11-23",
+      "confirmed": false,
+      "applies_to": ["freshman", "transferee", "returning"],
+      "source": "DRAFT - placeholder date, confirm against the posted announcement"
+    },
+    {
+      "label": "Add / drop period closes",
+      "date": "2026-11-30",
+      "confirmed": false,
+      "applies_to": ["freshman", "transferee", "returning"],
+      "source": "DRAFT - placeholder date, confirm against the posted announcement"
+    },
+    {
+      "label": "Scholarship application deadline",
+      "date": "2026-11-13",
+      "confirmed": false,
+      "applies_to": ["freshman", "transferee", "returning"],
+      "source": "DRAFT - placeholder date, confirm against the posted announcement"
+    }
+  ],
+  "fees": [
+    {
+      "label": "Tuition fee per unit",
+      "amount": 1500,
+      "currency": "PHP",
+      "confirmed": false,
+      "payment_options": ["full payment", "two installments (50% down on enrollment)"],
+      "source": "DRAFT - amount is a placeholder, confirm with the Cashier's Office"
+    },
+    {
+      "label": "Miscellaneous fee",
+      "amount": 1500,
+      "currency": "PHP",
+      "confirmed": false,
+      "payment_options": ["full payment", "two installments (50% down on enrollment)"],
+      "source": "DRAFT - amount is a placeholder, confirm with the Cashier's Office"
+    },
+    {
+      "label": "Laboratory fee",
+      "amount": 500,
+      "currency": "PHP",
+      "confirmed": false,
+      "payment_options": ["full payment"],
+      "source": "DRAFT - amount is a placeholder, confirm with the Cashier's Office"
+    }
+  ],
+  "policies": [
+    {
+      "id": "original_copies",
+      "statement": "Photocopies of requirements must be accompanied by the original for verification by the Registrar's Office.",
+      "source": "DRAFT - wording to be taken from the handbook"
+    },
+    {
+      "id": "unpaid_fees",
+      "statement": "Students with unpaid assessment fees are recorded as not officially enrolled until the payment is completed before the deadline.",
+      "source": "DRAFT - wording to be taken from the handbook"
+    },
+    {
+      "id": "clearance_required",
+      "statement": "Returning students must have a released clearance before they can be issued an assessment.",
+      "source": "DRAFT - wording to be taken from the handbook"
+    },
+    {
+      "id": "late_enrollment",
+      "statement": "Late enrollment is allowed only with the approval of the Registrar and payment of the late fee.",
+      "source": "DRAFT - wording to be taken from the handbook"
+    }
+  ],
+  "announcements": [
+    {
+      "date_posted": "2026-10-20",
+      "text": "Draft announcement: the Registrar's Office is open on weekdays only and releases assessments after all listed requirements are verified.",
+      "source": "DRAFT - placeholder announcement"
+    },
+    {
+      "date_posted": "2026-10-15",
+      "text": "Draft announcement: students should settle outstanding accountabilities before asking for a clearance.",
+      "source": "DRAFT - placeholder announcement"
+    }
+  ]
+}

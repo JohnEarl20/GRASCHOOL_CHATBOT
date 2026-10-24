@@ -1,0 +1,121 @@
+id,text,sentiment,source,status
+F001,ang bilis ng reply,positive,AI-drafted draft (no real people),to be replaced by Member B
+F002,very helpful thanks,positive,AI-drafted draft (no real people),to be replaced by Member B
+F003,this assistant is great,positive,AI-drafted draft (no real people),to be replaced by Member B
+F004,tnx po malaking tulong,positive,AI-drafted draft (no real people),to be replaced by Member B
+F005,super helpful answer,positive,AI-drafted draft (no real people),to be replaced by Member B
+F006,i like the step by step guide,positive,AI-drafted draft (no real people),to be replaced by Member B
+F007,perfect na answer,positive,AI-drafted draft (no real people),to be replaced by Member B
+F008,you explained it well,positive,AI-drafted draft (no real people),to be replaced by Member B
+F009,mabuting service po,positive,AI-drafted draft (no real people),to be replaced by Member B
+F010,easy to understand,positive,AI-drafted draft (no real people),to be replaced by Member B
+F011,this saved me a trip,positive,AI-drafted draft (no real people),to be replaced by Member B
+F012,ang accurate ng sinabi,positive,AI-drafted draft (no real people),to be replaced by Member B
+F013,helpful po,positive,AI-drafted draft (no real people),to be replaced by Member B
+F014,nice chatbot,positive,AI-drafted draft (no real people),to be replaced by Member B
+F015,very clear instructions,positive,AI-drafted draft (no real people),to be replaced by Member B
+F016,good job,positive,AI-drafted draft (no real people),to be replaced by Member B
+F017,salamat sa pag explain,positive,AI-drafted draft (no real people),to be replaced by Member B
+F018,i got what i needed,positive,AI-drafted draft (no real people),to be replaced by Member B
+F019,useful information,positive,AI-drafted draft (no real people),to be replaced by Member B
+F020,ang galing ng bot,positive,AI-drafted draft (no real people),to be replaced by Member B
+F021,fast response,positive,AI-drafted draft (no real people),to be replaced by Member B
+F022,love this,positive,AI-drafted draft (no real people),to be replaced by Member B
+F023,very friendly,positive,AI-drafted draft (no real people),to be replaced by Member B
+F024,exactly what i needed,positive,AI-drafted draft (no real people),to be replaced by Member B
+F025,helpful ang sagot,positive,AI-drafted draft (no real people),to be replaced by Member B
+F026,great explanation po,positive,AI-drafted draft (no real people),to be replaced by Member B
+F027,this is better than waiting in line,positive,AI-drafted draft (no real people),to be replaced by Member B
+F028,satisfied sa answer,positive,AI-drafted draft (no real people),to be replaced by Member B
+F029,everything worked,positive,AI-drafted draft (no real people),to be replaced by Member B
+F030,helpful staff answers,positive,AI-drafted draft (no real people),to be replaced by Member B
+F031,ang malinis na explanation,positive,AI-drafted draft (no real people),to be replaced by Member B
+F032,very informative,positive,AI-drafted draft (no real people),to be replaced by Member B
+F033,made my day,positive,AI-drafted draft (no real people),to be replaced by Member B
+F034,nice ui,positive,AI-drafted draft (no real people),to be replaced by Member B
+F035,recommended ko po,positive,AI-drafted draft (no real people),to be replaced by Member B
+F036,thank you so much,positive,AI-drafted draft (no real people),to be replaced by Member B
+F037,very helpful and clear,positive,AI-drafted draft (no real people),to be replaced by Member B
+F038,good service po,positive,AI-drafted draft (no real people),to be replaced by Member B
+F039,nakatulong po,positive,AI-drafted draft (no real people),to be replaced by Member B
+F040,awesome assistant,positive,AI-drafted draft (no real people),to be replaced by Member B
+F041,ok,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F042,i see,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F043,noted,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F044,thanks i will check,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F045,okay po,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F046,hmm,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F047,maybe,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F048,i think so,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F049,alright,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F050,sige,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F051,i will try that,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F052,copy po,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F053,noted po,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F054,okay thanks,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F055,understood,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F056,received,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F057,okay lang,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F058,i suppose so,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F059,got it,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F060,i see po,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F061,fine,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F062,oke po,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F063,will do,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F064,right,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F065,yes,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F066,no problem,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F067,maybe later,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F068,not sure yet,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F069,i will check the office,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F070,hmm okay,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F071,noted for now,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F072,i understand now,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F073,that is what i read,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F074,okay good,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F075,ay okay,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F076,sige salamat,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F077,noted na,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F078,i will see,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F079,understood po,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F080,okay noted,neutral,AI-drafted draft (no real people),to be replaced by Member B
+F081,unhelpful,negative,AI-drafted draft (no real people),to be replaced by Member B
+F082,wrong answer,negative,AI-drafted draft (no real people),to be replaced by Member B
+F083,this is confusing,negative,AI-drafted draft (no real people),to be replaced by Member B
+F084,ang wrong ng sinabi,negative,AI-drafted draft (no real people),to be replaced by Member B
+F085,i wasted my time,negative,AI-drafted draft (no real people),to be replaced by Member B
+F086,not useful,negative,AI-drafted draft (no real people),to be replaced by Member B
+F087,the answer was incorrect,negative,AI-drafted draft (no real people),to be replaced by Member B
+F088,mali,negative,AI-drafted draft (no real people),to be replaced by Member B
+F089,this is frustrating,negative,AI-drafted draft (no real people),to be replaced by Member B
+F090,it did not work,negative,AI-drafted draft (no real people),to be replaced by Member B
+F091,bakit ganito,negative,AI-drafted draft (no real people),to be replaced by Member B
+F092,nonsense,negative,AI-drafted draft (no real people),to be replaced by Member B
+F093,i do not understand,negative,AI-drafted draft (no real people),to be replaced by Member B
+F094,poor quality,negative,AI-drafted draft (no real people),to be replaced by Member B
+F095,this is useless,negative,AI-drafted draft (no real people),to be replaced by Member B
+F096,ang lupit,negative,AI-drafted draft (no real people),to be replaced by Member B
+F097,the bot is broken,negative,AI-drafted draft (no real people),to be replaced by Member B
+F098,it gave me the wrong office,negative,AI-drafted draft (no real people),to be replaced by Member B
+F099,misleading,negative,AI-drafted draft (no real people),to be replaced by Member B
+F100,very poor service,negative,AI-drafted draft (no real people),to be replaced by Member B
+F101,i still do not know,negative,AI-drafted draft (no real people),to be replaced by Member B
+F102,bad answer,negative,AI-drafted draft (no real people),to be replaced by Member B
+F103,walang saysa,negative,AI-drafted draft (no real people),to be replaced by Member B
+F104,this is not helpful at all,negative,AI-drafted draft (no real people),to be replaced by Member B
+F105,you ignored my question,negative,AI-drafted draft (no real people),to be replaced by Member B
+F106,the schedule was outdated,negative,AI-drafted draft (no real people),to be replaced by Member B
+F107,incorrect information,negative,AI-drafted draft (no real people),to be replaced by Member B
+F108,i am disappointed,negative,AI-drafted draft (no real people),to be replaced by Member B
+F109,tsk,negative,AI-drafted draft (no real people),to be replaced by Member B
+F110,unhelpful po,negative,AI-drafted draft (no real people),to be replaced by Member B
+F111,the answer made no sense,negative,AI-drafted draft (no real people),to be replaced by Member B
+F112,i want a real person,negative,AI-drafted draft (no real people),to be replaced by Member B
+F113,it keeps repeating,negative,AI-drafted draft (no real people),to be replaced by Member B
+F114,wrong deadline,negative,AI-drafted draft (no real people),to be replaced by Member B
+F115,unhelpful answer again,negative,AI-drafted draft (no real people),to be replaced by Member B
+F116,ang nakakainos,negative,AI-drafted draft (no real people),to be replaced by Member B
+F117,this assistant does not understand taglish,negative,AI-drafted draft (no real people),to be replaced by Member B
+F118,the requirement was wrong,negative,AI-drafted draft (no real people),to be replaced by Member B
+F119,i am wasting my time here,negative,AI-drafted draft (no real people),to be replaced by Member B
+F120,bad experience,negative,AI-drafted draft (no real people),to be replaced by Member B

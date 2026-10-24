@@ -1,0 +1,196 @@
+{
+  "corpus_size": 335,
+  "intents": 10,
+  "holdout_accuracy": 0.8955,
+  "holdout_macro_f1": 0.8965,
+  "cv5_macro_f1_mean": 0.8125,
+  "cv5_macro_f1_std": 0.0276,
+  "cv5_fold_scores": [
+    0.7928,
+    0.795,
+    0.788,
+    0.861,
+    0.8255
+  ],
+  "per_class_recall": {
+    "ask_clearance_process": {
+      "support": 7,
+      "recall": 1.0
+    },
+    "ask_course_prereq": {
+      "support": 6,
+      "recall": 0.6667
+    },
+    "ask_fees_payment": {
+      "support": 7,
+      "recall": 0.7143
+    },
+    "ask_office_hours_location": {
+      "support": 6,
+      "recall": 1.0
+    },
+    "ask_requirements": {
+      "support": 7,
+      "recall": 1.0
+    },
+    "ask_schedule_deadline": {
+      "support": 7,
+      "recall": 0.7143
+    },
+    "check_eligibility": {
+      "support": 8,
+      "recall": 0.875
+    },
+    "give_feedback": {
+      "support": 6,
+      "recall": 1.0
+    },
+    "greet": {
+      "support": 7,
+      "recall": 1.0
+    },
+    "request_human": {
+      "support": 6,
+      "recall": 1.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      7,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      4,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      5,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      6,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      7,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      2,
+      0,
+      0,
+      5,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      7,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      7,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6
+    ]
+  ],
+  "confusion_labels": [
+    "ask_clearance_process",
+    "ask_course_prereq",
+    "ask_fees_payment",
+    "ask_office_hours_location",
+    "ask_requirements",
+    "ask_schedule_deadline",
+    "check_eligibility",
+    "give_feedback",
+    "greet",
+    "request_human"
+  ],
+  "seed": 42,
+  "test_size": 0.2,
+  "caveat": "The hold-out split is drawn from the same writer distribution as the training data, so these numbers are optimistic. The proposal's target is macro F1 >= 0.80 on 50 questions written by a member who did not write the training phrases - that set does not exist yet.",
+  "trained_at": "2026-10-22T23:32:26",
+  "model_path": "models\\intent_model.joblib"
+}

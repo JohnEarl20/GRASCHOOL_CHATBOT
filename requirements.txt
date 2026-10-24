@@ -1,0 +1,17 @@
+# Cognitive Campus Assistant - dependencies
+#
+# Pinned to the versions this project was actually tested with, because
+# models/intent_model.joblib and models/sentiment_model.joblib are pickled
+# scikit-learn pipelines. Unpickling across scikit-learn versions can fail or,
+# worse, silently mispredict - so the pin is load-bearing, not tidiness.
+#
+# Verified on: Python 3.14.2, Windows 11, `python tests/test_app.py` = 81 checks.
+
+streamlit==1.53.0
+scikit-learn==1.8.0
+pandas==2.3.3
+numpy==2.4.1
+joblib==1.5.3
+openpyxl==3.1.5      # reads the starter corpus, which is an .xlsx with a .csv name
+altair==6.0.0        # the dashboard charts (st.line_chart renders to canvas and
+                     # cannot be recoloured by CSS, so the charts are Altair SVG)

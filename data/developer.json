@@ -1,0 +1,20 @@
+{
+  "team": "Cognitive Campus Assistant",
+  "course": "CS ELEC 6",
+  "school": "GRA SCHOOL",
+  "developers": [
+    {
+      "name": "John Earl Mirabete",
+      "role": "Developer",
+      "photo": "assets/developer.jpg",
+      "photo_alt": "Portrait photo of John Earl Mirabete"
+    },
+    {
+      "name": "Tristan Napili",
+      "role": "Developer",
+      "photo": "assets/tristan.jpg",
+      "photo_alt": "Portrait photo of Tristan Napili"
+    }
+  ],
+  "note": "Read by the Developer profile card in the sidebar. Change the values here - nothing in app.py hardcodes them."
+}

@@ -1,0 +1,28 @@
+# --- secrets -------------------------------------------------------------
+# The staff passcode. Never commit it. code/staff_gate.py reads it from the
+# environment, from .env, or from .streamlit/secrets.toml - and stays locked
+# when none of them is set, so nothing secret is needed in the repository.
+.env
+.streamlit/secrets.toml
+
+# --- editor / agent workspace artifacts ----------------------------------
+# These are Code Janitor's own memory files. They are not imported by any
+# Python module, and their previews print STAFF_PASSCODE in plaintext.
+workspace.json
+workspacememory.md
+graphify-out/
+
+# --- Python --------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# --- stray Windows artifact ----------------------------------------------
+# A 0-byte file left by a shell redirect to the reserved device name NUL.
+nul
+
+# --- OS ------------------------------------------------------------------
+.DS_Store
+Thumbs.db
