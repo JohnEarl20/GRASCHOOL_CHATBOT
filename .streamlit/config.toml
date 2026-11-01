@@ -3,6 +3,10 @@
 # chrome and the custom cards stay in the same colour system.
 [server]
 headless = true
+# Serves files under ./static/ at /app/static/<name>. The login wallpaper is
+# 1.9 MB; inlining it as a data URI would push 2.4 MB of base64 into the page
+# on every rerun, so it is served as a cacheable file instead.
+enableStaticServing = true
 
 [browser]
 gatherUsageStats = false
@@ -13,10 +17,13 @@ gatherUsageStats = false
 # renders on a light surface that cannot be recoloured reliably. Hide it.
 toolbarMode = "minimal"
 
+# The app is dark-only. These values mirror DARK_TOKENS in ui/theme.py so
+# Streamlit's own widgets (portals, dialogs, the file uploader) start from the
+# same palette instead of flashing a light surface before the CSS lands.
 [theme]
-base = "light"
-primaryColor = "#1E40AF"
-backgroundColor = "#EFF6FF"
-secondaryBackgroundColor = "#FFFFFF"
-textColor = "#1E3A8A"
+base = "dark"
+primaryColor = "#2F6BFF"
+backgroundColor = "#070B1F"
+secondaryBackgroundColor = "#141C3D"
+textColor = "#EDF1FF"
 font = "sans serif"

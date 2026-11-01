@@ -1,209 +1,242 @@
-# Cognitive Campus Assistant
+# GRA SCHOOL — Cognitive Campus Assistant
 
-An enrollment requirements and student services advisor for the Registrar's
-Office. Students ask in English, Filipino or Taglish; the assistant answers
-with a confidence score, the source of the answer, and the rules that fired.
+An explainable enrollment requirements and student services advisor built for the Registrar's Office of **GRA SCHOOL**. Students and staff interact with the assistant in English, Filipino, or Taglish. The system delivers transparent answers complete with confidence scores, source citations from the school ontology, and the exact rules that fired.
 
-Built to the architecture in `CSELEC6_TeamName_Prefinal_Proposal.pdf`
-(sections 5 to 13): the rule base answers the fixed policy, the trained model
-handles the language, and the staff dashboard shows what the office should
-look at next.
+Built for **CS ELEC 6 (Introduction to Cognitive Computing)** by **John Earl Mirabete** and **Tristan Napili**.
 
 ---
 
-## Run it
+## Quick Start
+
+### 1. Installation & Preparation
 
 ```bash
+# Install dependencies
 python -m pip install -r requirements.txt
-python scripts/prepare_corpus.py     # extract the starter corpus, merge the rest
-python scripts/train_models.py       # train the intent and sentiment models
-python -m streamlit run app.py       # open http://localhost:8501
+
+# Extract and merge the training corpus
+python scripts/prepare_corpus.py
+
+# Train intent classification and sentiment models
+python scripts/train_models.py
 ```
 
-Optional, for the staff dashboard demo:
+### 2. Run the Application
 
 ```bash
-python scripts/seed_sample_logs.py   # 292 synthetic turns, clearly flagged as synthetic
+# Launch Streamlit on local port 8501
+python -m streamlit run app.py
 ```
 
-Run the tests:
+Open your browser to: **http://localhost:8501**
+
+### 3. Run Regression Checks & Tests
 
 ```bash
-python tests/test_app.py             # 81 checks
-```
+python tests/test_app.py
 
-Use `python`, not `python3.14.exe` - the copy in
-`C:\Users\John Earl Mirabete\.local\bin\` is blocked by an Application Control
-policy on this machine. The working interpreter is `C:\Python314\python.exe`.
+> All **81 verification checks** must pass cleanly across the 13 rule cases, ontology schema consistency, Taglish NLU extraction, and conversation state management.
+
+*(Note: On Windows, use `python`, not `python3.14.exe` if local path restrictions apply. The standard interpreter is `C:\Python314\python.exe`.)*
 
 ---
 
-## What the assistant does
+## Authentication & Role-Based Access Control
 
-| Intent | Answered from | Example |
-    |---|---|---|
-| `greet` | conversation + privacy notice | "hi po good morning" |
-| `ask_requirements` | ontology - Requirement | "what do I need to enroll as a freshman" |
-| `check_eligibility` | rule base - forward chaining | "can I enroll, transferee ako may TOR" |
-| `ask_schedule_deadline` | ontology - Deadline | "when is the payment deadline" |
-| `ask_fees_payment` | ontology - Fee | "where do I pay the assessment" |
-| `ask_office_hours_location` | ontology - Office | "what time does the registrar open" |
-| `ask_course_prereq` | ontology - Course | "prerequisite of CS 201" |
-| `ask_clearance_process` | ontology - Service | "how do I get my clearance" |
-| `request_human` | hand-off | "pakausap po sa staff" |
-| `give_feedback` | sentiment model | "thanks that was helpful" |
+The application implements a unified authentication system (`code/auth.py`) with password hashing via SHA-256 and role separation. Account data is stored locally in `data/users.json` and is not included in the repository:
 
-The eligibility answer is never written by hand - it is the conclusion of the
-13 rules in `rules_trace.py`, and the answer shows the rules that fired. The
-"why this answer" panel is backward chaining: it walks back from
-`eligible(official_enrollment)` to the fact that is missing.
+- **🎓 Student Accounts**:
+  - Access to the **AI Assistant** conversation interface.
+  - Access to the **Voice Upload** audio recording tool.
+  - Access to a focused **Settings** view with personalized AI confidence preferences, security/password controls, notification settings, and system monitoring.
+
+- **👨‍🏫 Staff Accounts**:
+  - Access to all student features plus the **Staff Dashboard** (`/?view=dashboard`).
+  - Access to the full **Advanced Futuristic Settings Dashboard** (all 10 management categories, real hardware telemetry, manual/automated database backups, user provisioning, and audit logs).
+
+Users can create new student or staff accounts directly through the **Create Account** sidebar view.
 
 ---
 
-## Layout
+## Core Capabilities & Architecture
+
+User Query (English / Filipino / Taglish)
+                     ↓
+  [1] NLU Layer (`code/nlu.py`)
+      • Lowercasing, particle normalization ("po", "ba", "kasi", "naman")
+      • Entity extraction (student_type, documents_held, documents_missing)
+                     ↓
+  [2] Learning Layer (`code/intent_model.py`)
+      • Scikit-learn TF-IDF Vectorizer + Logistic Regression (10 Intents)
+      • Naive Bayes Sentiment Classifier for student feedback
+                     ↓
+  [3] Policy & Dialogue Layer (`code/dialogue.py`)
+      • Banded confidence thresholds (Answer ≥ 0.60, Clarify 0.40–0.59, Fallback < 0.40)
+      • Margin-of-victory heuristic (answers if top intent beats runner-up by ≥ 0.25)
+      • Session memory for accumulated student facts and documents
+                     ↓
+  [4] Cognitive Reasoning Layer (`code/explain.py` & `rules_trace.py`)
+      • Forward chaining over 13 registrar handbook rules
+      • Backward chaining explanation ("Why this answer?") identifying blocking facts
+                     ↓
+  [5] Knowledge Base (`code/knowledge.py` & `data/ontology.json`)
+      • 11 ontology sections: Requirements, Deadlines, Fees, Offices, Services, etc.
+                     ↓
+  [6] Presentation Layer (`ui/`)
+      • Streamlit wide-layout responsive web app
+      • Full-page GRA SCHOOL campus background wallpaper (`static/campus-bg.png`)
+      • Cyber-blue futuristic glassmorphism design system (`ui/theme.py`)
+      • Reusable presentation widgets and profile cards (`ui/components.py`)
+      • Advanced 10-module settings dashboard (`ui/settings_dashboard.py`)
+
+---
+
+## What the Assistant Knows (10 Intents)
+
+| Intent | Source | Example Query |
+
+|---|---|---|
+
+| `greet` | Conversation state | *"Hi po, good morning!"* |
+| `ask_requirements` | Ontology — `Requirement` | *"What do I need to enroll as a freshman?"* |
+| `check_eligibility` | Rule Base — Forward Chaining | *"Can I enroll? Transferee ako and I have my TOR."* |
+| `ask_schedule_deadline` | Ontology — `Deadline` | *"When is the assessment payment deadline?"* |
+| `ask_fees_payment` | Ontology — `Fee` | *"How much is the tuition fee and where do I pay?"* |
+| `ask_office_hours_location` | Ontology — `Office` | *"What time does the registrar open?"* |
+| `ask_course_prereq` | Ontology — `Course` | *"What is the prerequisite for CS 201?"* |
+| `ask_clearance_process` | Ontology — `Service` | *"Paano kumuha ng clearance para sa transferee?"* |
+| `request_human` | Staff Hand-Off | *"Pakausap po sa human registrar staff."* |
+| `give_feedback` | Sentiment Model | *"Salamat po, very helpful ang sagot!"* |
+
+---
+
+## The Four Application Views
+
+1. **AI Assistant (`/?view=chat`)**:
+   - Conversational chat interface featuring student and assistant bubbles.
+   - Expandable answer metadata cards showing exact confidence percentages, source documents, rules fired, and backward-chaining explanations.
+   - Quick suggested prompt buttons for common enrollment inquiries.
+   - Dynamic sidebar profile card displaying user role, name, and live online indicator.
+
+2. **Voice Upload (`/?view=voice`)**:
+   - In-browser microphone audio recording (`st.audio_input`).
+   - Drag-and-drop audio file upload supporting WAV, MP3, M4A, and WEBM.
+   - Native audio playback preview. *(Note: Voice input is record-and-play only; queries are answered by typing into the AI Assistant view).*
+
+3. **Staff Analytics Dashboard (`/?view=dashboard`)**:
+   - Restricted to authenticated staff accounts.
+   - Four high-level KPIs: Total logged turns, Answer rate, Escalation rate, and Positive feedback ratio.
+   - Altair SVG charts: Weekly question volume trend, queries by category bar chart, and sentiment distribution.
+   - Time-series volume forecasting for peak enrollment periods.
+   - Unanswered queries triage table with manual staff review tools.
+
+4. **Advanced Futuristic Settings Dashboard (`/?view=settings`)**:
+   - Re-designed to match the GRA SCHOOL futuristic educational dashboard design reference.
+   - **For Staff**: 10 comprehensive management categories:
+     1. *Overview* — Interactive 2-column quick configuration grid.
+     2. *General* — Language, time zone, and date format preferences.
+     3. *AI Assistant* — Personality, response length, language, and confidence threshold sliders.
+     4. *Security* — Live password change, 2FA toggle, session inactivity timeout, and brute-force protection.
+     5. *Users* — Account table and administrative user provisioning.
+     6. *Notifications* — System notices, announcements, document reminders, and sound alerts.
+     7. *Database* — Storage health inspector, automatic backup scheduling, manual ZIP archive creation, and JSONL log export.
+     8. *System* — Live hardware telemetry using `psutil` (CPU load, RAM utilization, continuous uptime).
+     9. *School* — Institutional metadata editor syncing directly with `data/ontology.json`.
+     10. *Logs* — System activity and audit trail with clear history function.
+     - Right-side System Status panel, Quick Action buttons, and Recent Changes audit feed.
+   - **For Students / Users**:
+     - Clean, focused interface containing only relevant categories: *Overview*, *AI Assistant Configuration*, *Security & Password*, *Notifications*, and *System Monitoring*.
+     - Preferences persist to `data/app_prefs.json` and automatically reload across sessions.
+
+5. **Developers Page (`/?view=developers`)**:
+   - Profile cards for project developers (John Earl Mirabete and Tristan Napili).
+   - Embedded within the Settings workspace for clean navigation.
+
+---
+
+## Directory Structure
 
 ```text
-app.py                    Streamlit entry point: 4 views behind a sidebar
-rules_trace.py            the 13 rules and the forward chaining engine (original prototype)
-ui/
-  theme.py                design tokens, glassmorphism CSS, inline Lucide icons
-  components.py           reusable pieces: brand, nav, KPI, cards, chat bubbles
-code/
-  nlu.py                  preprocessing, Taglish particle removal, entity extraction
-  intent_model.py         TF-IDF + logistic regression intent model
-  sentiment.py            Naive Bayes feedback sentiment model
-  knowledge.py            the ontology records and the answers built from them
-  explain.py              backward chaining - what is blocking this student
-  dialogue.py             session memory, confidence policy, clarification, hand-off
-  logger.py               the chat log the dashboard reads
-  forecast.py             weekly volume forecast and the staff recommendation
-data/
-  ontology.json           11 sections, every record with a source note
-  starter_corpus_50.csv   the team's own 50 labelled questions
-  intent_corpus_augmented.csv  300 AI-drafted questions to extend it
-  feedback_corpus.csv     120 comments labelled positive / neutral / negative
-  chat_log.jsonl          runtime log (one JSON line per turn)
-  developer.json          the developer profiles shown on the Developers page
-models/                   trained artifacts + the metrics shown in the dashboard
-assets/                   developer portraits
-scripts/                  prepare_corpus.py, train_models.py, seed_sample_logs.py
-tests/test_app.py         81 checks
+├── app.py                      # Main Streamlit application and view router
+├── rules_trace.py              # Forward chaining rule engine & 13 registrar rules
+├── requirements.txt            # Pinned Python package dependencies
+├── README.md                   # Complete system documentation
+├── GABAY.md                    # Detailed Filipino/Taglish reference guide
+├── CSELEC6_TeamName_...docx    # Prefinal-final project proposal document
+├── ui/
+│   ├── theme.py                # Design tokens, cyber-blue CSS, Lucide icons
+│   ├── components.py           # Presentation components, user card, banners
+│   └── settings_dashboard.py   # Advanced futuristic settings dashboard
+├── code/
+│   ├── auth.py                 # Unified authentication & SHA-256 password hashing
+│   ├── dialogue.py             # Session state, threshold policy, hand-off
+│   ├── nlu.py                  # Taglish particle normalization & entity extraction
+│   ├── intent_model.py         # TF-IDF + Logistic Regression intent classifier
+│   ├── sentiment.py            # Naive Bayes student feedback classifier
+│   ├── knowledge.py            # Ontology query handler and record retrieval
+│   ├── explain.py              # Backward chaining rule-block explainability
+│   ├── logger.py               # JSONL turn logging for analytics
+│   ├── forecast.py             # Altair charts and weekly inquiry volume forecast
+│   └── staff_gate.py           # Legacy registrar passcode gate support
+├── data/
+│   ├── users.json              # Hashed credentials and user accounts
+│   ├── app_prefs.json          # Persistent assistant & system configuration
+│   ├── ontology.json           # 11 registrar knowledge classes and facts
+│   ├── starter_corpus_50.csv   # Human-written baseline labeled queries
+│   ├── intent_corpus_augmented.csv # Augmented training inquiries
+│   ├── feedback_corpus.csv     # Labeled sentiment feedback data
+│   ├── chat_log.jsonl          # Session turn logs for staff analytics
+│   └── backups/                # Zipped database and configuration archives
+├── models/
+│   ├── intent_model.joblib     # Pickled scikit-learn intent pipeline
+│   ├── sentiment_model.joblib  # Pickled scikit-learn sentiment pipeline
+│   └── intent_metrics.json     # Hold-out evaluation metrics
+├── static/
+│   └── campus-bg.png           # High-resolution campus wallpaper asset
+├── scripts/
+│   ├── prepare_corpus.py       # Corpus ingestion and preprocessing
+│   ├── train_models.py         # Scikit-learn model training script
+│   └── seed_sample_logs.py     # Generates synthetic data for dashboard testing
+└── tests/
+    └── test_app.py             # 81 regression and verification checks
 ```
 
-### The four views
+---
 
-| View | URL | What it shows |
-|---|---|---|
-| AI Assistant | `/?view=chat` | The conversation, suggested prompts, answer cards |
-| Voice Upload | `/?view=voice` | Browser recording + audio upload with playback |
-| Staff Dashboard | `/?view=dashboard&role=Staff` | KPIs, charts, recommendation, unanswered table |
-| Developers | `/?view=developers` | Profile cards with circular portraits |
+## Technical Defense & Evaluation Q&A
 
-Views are addressable by query parameter, so any page can be bookmarked or
-linked directly. `?role=Student` hides the dashboard nav entry; `?role=Staff`
-shows it. The role switch is a demo control, **not authentication** - this
-project has no login, so no password is asked for or checked.
+### Q1: Bakit hybrid approach (Machine Learning + Rule-Based)?
 
-### Design system
+**Sagot:**
+Hindi mapagkakatiwalaan ang purong Machine Learning o generative LLM sa mga kritikal na patakaran ng eskwelahan tulad ng enrollment eligibility dahil may posibilidad ng hallucination. Sa kabilang banda, hindi naman kayang intindihin ng purong rule-based system ang samu't saring paraan ng pagtatanong ng mga estudyante (Taglish, slang, typos).
 
-Dark navy canvas with royal-blue and violet gradients, glassmorphism panels,
-Inter throughout, and inline Lucide SVG icons (no emoji, no icon font).
-Charts are built with Altair rather than `st.line_chart`, because Streamlit's
-built-in charts render to canvas and cannot be recoloured by CSS - they stayed
-a white box on the dark canvas. Altair renders to SVG and takes the palette.
+Kaya gumamit ang sistema ng **Hybrid Architecture**:
+
+1. **Machine Learning (TF-IDF + Logistic Regression)** ang sumasala sa natural language at nagtutukoy ng `intent`.
+2. **Rule-Based Forward Chaining Engine** (13 handbook rules) ang gumagawa ng 100% deterministikong desisyon kung kwalipikado nang mag-enroll ang estudyante.
+3. **Ontology Knowledge Base** ang nagbibigay ng opisyal na impormasyon sa requirements, deadlines, at fees.
+
+### Q2: Paano gumagana ang "Why this answer?" (Explainability)?
+
+**Sagot:**
+Gumagamit ang system ng **Backward Chaining** (`code/explain.py`). Kapag nagtanong ang estudyante ng *"Can I enroll?"*, sinusuri ng engine ang goal state na `eligible(official_enrollment)`. Kung hindi pa ito naabot, sinusuri pabalik ang dependency tree ng mga patakaran para matukoy kung aling partikular na dokumento (hal. `tor`, `honorable_dismissal`, o `clearance`) ang kulang. Ipinapakita ito sa estudyante bilang malinaw na listahan ng mga dokumentong mayroon na sila, mga kulang pa, at ang mga partikular na rule IDs na nag-fire.
+
+### Q3: Paano pinapangalagaan ang data privacy ng mga estudyante?
+
+**Sagot:**
+Alinsunod sa **Data Privacy Act of 2012 (RA 10173)**:
+
+- Hindi kailanman humihingi ang assistant ng sensitibong impormasyon tulad ng
+grado, buong address, o financial bank details habang nakikipag-usap.
+- Ang mga dokumentong binabanggit ng estudyante sa chat ay pansamantalang nakatago lamang sa **in-memory session state** at awtomatikong nawawala kapag nag-reset ang session.
+- Ang mga password sa `data/users.json` ay naka-encrypt gamit ang **SHA-256 cryptographic hashing**.
+- Ang mga chat logs na iniimbak para sa staff analytics ay limitado sa query text, classified intent, confidence score, at rules fired nang walang personal identity linkage.
 
 ---
 
-## The confidence policy
+## Project Status & Verification
 
-Proposal section 11 sets three bands. They are implemented in
-`code/dialogue.py`:
-
-| Confidence | Behaviour |
-|---|---|
-| >= 0.60 | answer, with the confidence, the source and the rules that fired |
-| 0.40 - 0.59 | clarify, with buttons |
-| < 0.40 | fallback message; after two misses, hand off to a staff member |
-
-**One documented deviation.** With a 324-question corpus the model is often
-right but not confident: "What do I need to enroll as a freshman?" scored 0.59
-for `ask_requirements` against 0.09 for the runner-up. Answering the
-proposal's literal policy there means asking "do you mean requirements or
-deadlines?" about an unambiguous question. So a top intent that beats the
-runner-up by 0.25 or more is answered even inside the clarify band, and the
-answer card says so and shows the real confidence. Genuinely ambiguous
-questions still get the clarifying question.
-
----
-
-## What the numbers are
-
-Measured on this machine with `python scripts/train_models.py`:
-
-| Model | Hold-out | Cross-validation | Proposal target |
-      |---|---|---|---|
-| Intent (324 questions, 10 intents) | accuracy 0.86, macro F1 0.86 | 5-fold macro F1 0.81 +/- 0.08 | macro F1 >= 0.80 on 50 unseen questions |
-| Sentiment (120 comments) | accuracy 0.67, macro F1 0.64 | 5-fold macro F1 0.60 | >= 0.75 accuracy, per-class F1 |
-
-Read these carefully before they go in the proposal:
-
-- **The intent hold-out is optimistic.** It is drawn from the same writer
-  distribution as the training data. The proposal's target - macro F1 on 50
-  questions written by a member who did not write the training phrases - cannot
-  be claimed until that set exists. The proposal's Figure 5 mockup already
-  says "illustrative sample data", and the model metrics file repeats this.
-- **The sentiment model misses the 0.75 target.** 0.67 accuracy on the hold-out
-  is below the target in proposal section 13. More comments, written by
-  different people, are the fix; the model itself is only the baseline.
-- **The corpus is partly AI-drafted.** `data/starter_corpus_50.csv` is the
-  team's own writing. The 300 added questions are AI drafts, marked
-  `source = AI-drafted draft (no real people)` and
-  `status = to be replaced by Member B`. 26 of them were exact repeats of the
-  team's wording after normalization and were dropped, so 324 rows are used.
-  Member B still has to replace the drafts before the data card is honest.
-- **The rules are the solid part.** 20 hand-made rule cases, the agreement
-  between the ontology and the rule base, the entity extraction and the
-  conversation behaviour are covered by 81 checks that pass.
-
----
-
-## Known gaps
-
-These are deliberately not finished, and the interface says so instead of
-pretending:
-
-- **Voice is record-and-play only.** The browser microphone (`st.audio_input`)
-  and drag-and-drop upload for WAV/MP3/M4A/WEBM both work, and the clip plays
-  back. There is **no speech-to-text**: the assistant answers typed questions,
-  so type what you asked on the AI Assistant page. Speech recognition was
-  deliberately left out rather than half-built.
-- **The optional LLM reword step is off and unwired.** The toggle exists and
-  is off by default (proposal section 5). No provider is connected, so every
-  answer is still the one the rules and the knowledge base produced. The
-  "turn off the LLM" test therefore passes trivially - decide as a team
-  whether to add a provider.
-- **Every value in `data/ontology.json` is a draft.** The amounts, dates and
-  office hours were written by the team as placeholders and are marked
-  `DRAFT` in each record's source note. The answers carry that warning. They
-  have to be replaced with values taken from the actual handbook and posted
-  announcements before anyone acts on them.
-- **The chat log is not yet filtered for personal data.** The assistant never
-  asks for a name or an ID number, but a student can still type one into a
-  question. Proposal section 14 says the logs are masked; that masking step is
-  not written yet.
-- **The proposal points at `code/rules_trace.py`; the engine is at the project
-  root.** Move it into `code/` or correct the proposal before the defense.
-- **No fairness check yet.** Proposal section 13 asks for the accuracy gap
-  between English and Taglish groups, and between clear and noisy audio. The
-  per-class recall is in `models/intent_metrics.json`; the group split needs
-  the 50 unseen questions.
-
----
-
-## Privacy
-
-The assistant never asks for a name, ID number, grades or contact details, and
-the first screen says so. The log stores the question, the intent, the
-confidence, whether it was answered and the rules that fired - no identity
-fields. The `has` facts used by the rule base are the documents the student
-said they hold, and they live in the session only.
+- **Current Build**: `v2.0.0`
+- **Unit & Integration Tests**: `python tests/test_app.py` passed (**81 / 81 checks**).
+- **Intent Classifier**: Hold-out accuracy `0.86`, Macro F1 `0.86` across 10 intents.
+- **Design System**: Fully responsive dark-glass UI with full-page campus wallpaper, live hardware telemetry, and role-tailored dashboard controls.

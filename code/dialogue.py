@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 
 import rules_trace
 from code import explain, knowledge, logger, nlu
+from code import conversation
 from code.intent_model import get_model as get_intent_model
 from code.sentiment import get_model as get_sentiment_model
 
@@ -125,10 +126,12 @@ class Policy:
             )
 
 
-def _log(text: str, reply: Reply, session: Session) -> None:
+def _log(text: str, reply: Reply, session: Session, student_id: str | None = None, student_name: str | None = None) -> None:
     logger.log_turn(
         {
             "session_id": session.session_id,
+            "student_id": student_id,
+            "student_name": student_name,
             "text": text,
             "intent": reply.intent,
             "confidence": reply.confidence,
@@ -260,9 +263,16 @@ def _eligibility(session: Session, intent: str, confidence: float) -> Reply:
     )
 
 
-def _handoff(session: Session, intent: str, confidence: float) -> Reply:
+def _handoff(session: Session, intent: str, confidence: float, student_id: str | None = None, student_name: str | None = None) -> Reply:
     session.escalated = True
     note = knowledge.handoff_note()
+    
+    # Create a conversation for staff handoff if one doesn't exist
+    if student_id:
+        existing = conversation.get_student_conversation(student_id)
+        if not existing:
+            conversation.create_conversation(student_id, student_name)
+    
     return Reply(
         text=note.text,
         intent=intent,
@@ -308,7 +318,7 @@ def _is_decisive(prediction, margin: float = DECISIVE_MARGIN) -> bool:
     return _margin(prediction) >= margin
 
 
-def handle(text: str, session: Session, policy: "Policy | None" = None) -> Reply:
+def handle(text: str, session: Session, policy: "Policy | None" = None, student_id: str | None = None, student_name: str | None = None) -> Reply:
     """Handle one student message and return the assistant's reply.
 
     `policy` overrides the module defaults for this call. The Settings page
@@ -337,7 +347,7 @@ def handle(text: str, session: Session, policy: "Policy | None" = None) -> Reply
             reply.text += "\n\n" + knowledge.handoff_note().text
             reply.escalated = True
             session.escalated = True
-        _log(text, reply, session)
+        _log(text, reply, session, student_id, student_name)
         return reply
 
     entities = nlu.extract(text)
@@ -360,7 +370,7 @@ def handle(text: str, session: Session, policy: "Policy | None" = None) -> Reply
             )
             reply.decisive = _is_decisive(prediction, policy.decisive_margin)
             reply.margin = _margin(prediction)
-            _log(text, reply, session)
+            _log(text, reply, session, student_id, student_name)
             return reply
 
         session.misses += 1
@@ -400,7 +410,7 @@ def handle(text: str, session: Session, policy: "Policy | None" = None) -> Reply
             answered=True,
         )
     elif prediction.intent == "request_human":
-        reply = _handoff(session, prediction.intent, prediction.confidence)
+        reply = _handoff(session, prediction.intent, prediction.confidence, student_id, student_name)
     elif prediction.intent == "give_feedback":
         reply = _feedback_reply(text, session, prediction.intent, prediction.confidence)
     elif prediction.intent == "check_eligibility":
@@ -417,7 +427,7 @@ def handle(text: str, session: Session, policy: "Policy | None" = None) -> Reply
 
     reply.decisive = _is_decisive(prediction, policy.decisive_margin)
     reply.margin = _margin(prediction)
-    _log(text, reply, session)
+    _log(text, reply, session, student_id, student_name)
     return reply
 
 

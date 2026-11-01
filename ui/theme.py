@@ -13,32 +13,46 @@ from __future__ import annotations
 import streamlit as st
 
 DARK_TOKENS = {
-    # canvas and surfaces
-    "--bg": "#070B1F",
-    "--bg-2": "#0B1230",
-    "--sidebar-bg": "linear-gradient(180deg, rgba(13,19,45,0.94), rgba(9,13,34,0.94))",
-    "--input-bg": "rgba(13,19,45,0.85)",
-    "--table-head-bg": "rgba(22,30,66,0.75)",
-    "--table-row-bg": "rgba(13,19,45,0.6)",
-    "--overlay": "linear-gradient(180deg, transparent 0%, rgba(7,11,31,0.55) 100%)",
-    "--surface": "rgba(22, 30, 66, 0.62)",
-    "--surface-solid": "#141C3D",
-    "--surface-hover": "rgba(32, 42, 88, 0.72)",
-    # accents
-    "--primary": "#2F6BFF",
-    "--primary-2": "#6D4AFF",
-    "--violet": "#8B5CF6",
-    "--accent": "#22D3EE",
-    # text
-    "--fg": "#EDF1FF",
-    "--fg-muted": "#A3B0D4",
-    "--fg-dim": "#7C89B0",
+    # canvas and surfaces. The navy is cool and low-chroma so the blue/violet
+    # accents are the only saturated things on the page; a warmer or lighter
+    # base made the glass panels read as muddy grey.
+    "--bg": "#020B20",
+    "--bg-2": "#061A3A",
+    "--sidebar-bg": "linear-gradient(180deg, rgba(6,26,58,0.92), rgba(2,11,32,0.94))",
+    "--input-bg": "rgba(8, 24, 54, 0.86)",
+    "--table-head-bg": "rgba(12, 34, 74, 0.82)",
+    "--table-row-bg": "rgba(8, 24, 54, 0.62)",
+    "--overlay": "linear-gradient(180deg, transparent 0%, rgba(2,11,32,0.55) 100%)",
+    "--surface": "rgba(12, 34, 74, 0.62)",
+    "--surface-solid": "#061A3A",
+    "--surface-hover": "rgba(16, 44, 92, 0.78)",
+    # accents: electric blue carries the brand, neon blue and cyan are the
+    # glow highlights, violet stays as the gradient's far end.
+    # The requested primary, #087CFF, measures 3.93:1 under white - below AA for
+    # a button label. #0A72EA is the same hue, darkened just enough to reach
+    # 4.56:1 white-on-blue while still reading as electric blue on the canvas.
+    # #087CFF is kept for borders, icons and glow, where no text sits on it.
+    "--primary": "#0A72EA",
+    "--primary-2": "#087CFF",
+    "--violet": "#7A5CFF",
+    "--neon": "#00BFFF",
+    "--accent": "#35D5FF",
+    # text. White is 19.6:1 on --bg; secondary 10.15:1 - both comfortably AA.
+    "--fg": "#FFFFFF",
+    "--fg-muted": "#A9BCD8",
+    "--fg-dim": "#7E93B4",
     # lines and states
-    "--border": "rgba(122, 146, 214, 0.22)",
-    "--border-strong": "rgba(122, 146, 214, 0.38)",
+    "--border": "rgba(0, 153, 255, 0.35)",
+    "--border-strong": "rgba(0, 153, 255, 0.60)",
+    "--primary-soft": "rgba(8, 124, 255, 0.16)",
+    "--primary-soft-strong": "rgba(8, 124, 255, 0.30)",
+    "--primary-glow": "rgba(0, 191, 255, 0.45)",
     "--success": "#34D399",
+    "--success-soft": "rgba(52, 211, 153, 0.14)",
     "--warning": "#FBBF24",
+    "--warning-soft": "rgba(251, 191, 36, 0.14)",
     "--danger": "#F87171",
+    "--danger-soft": "rgba(248, 113, 113, 0.14)",
     # shape and motion
     "--radius-sm": "10px",
     "--radius": "16px",
@@ -82,10 +96,12 @@ LIGHT_TOKENS = {
 
 TOKENS = DARK_TOKENS  # default, kept for callers that import it directly
 
+# Kept low on purpose: these glows sit behind body copy, and at their previous
+# strength (0.20/0.18) the centre of the page lifted enough to soften the text.
 _RADIAL_DARK = (
-    "radial-gradient(1100px 620px at 12% -8%, rgba(47,107,255,0.20), transparent 62%),"
-    "radial-gradient(900px 560px at 92% 4%, rgba(109,74,255,0.18), transparent 60%),"
-    "radial-gradient(760px 520px at 50% 108%, rgba(34,211,238,0.08), transparent 60%)"
+    "radial-gradient(1100px 620px at 12% -8%, rgba(47,107,255,0.14), transparent 62%),"
+    "radial-gradient(900px 560px at 92% 4%, rgba(122,92,255,0.12), transparent 60%),"
+    "radial-gradient(760px 520px at 50% 108%, rgba(34,211,238,0.06), transparent 60%)"
 )
 
 _RADIAL_LIGHT = (
@@ -114,8 +130,16 @@ html, body, [class*="css"] {{
 }}
 
 /* ---------- canvas ---------- */
+/* The login wallpaper covers the whole viewport. It is served from
+   /app/static/ (enableStaticServing in .streamlit/config.toml) rather than
+   inlined, because the image is 1.9 MB - as a data URI it would add 2.4 MB of
+   base64 to every rerun. `background-attachment: fixed` is dropped under
+   900px, where several mobile browsers stall scrolling with a fixed cover. */
 .stApp {{
-  background: {radial}, var(--bg);
+  background:
+    linear-gradient(180deg, rgba(2, 10, 30, 0.45) 0%, rgba(2, 10, 30, 0.62) 100%),
+    url('/app/static/campus-bg.png') center center / cover no-repeat fixed,
+    var(--bg);
   color: var(--fg);
 }}
 .stApp::before {{
@@ -138,13 +162,39 @@ h1, h2, h3, h4, h5 {{
 p, li, label, span {{ color: var(--fg); }}
 a {{ color: var(--accent); }}
 
-/* ---------- sidebar ---------- */
-[data-testid="stSidebar"] {{
-  background: var(--sidebar-bg);
-  border-right: 1px solid var(--border);
-  backdrop-filter: blur(14px);
+/* ---------- sidebar ----------
+   Translucent navy glass so the campus wallpaper shows through. Streamlit
+   paints its own opaque surface on the sidebar and its inner scroll container,
+   so both are cleared here; without this the sidebar is a solid block over the
+   image. */
+[data-testid="stSidebar"],
+[data-testid="stSidebarContent"],
+[data-testid="stSidebar"] > div {{
+  background: rgba(4, 14, 34, 0.55) !important;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
 }}
-[data-testid="stSidebar"] * {{ color: var(--fg); }}
+[data-testid="stSidebar"] {{
+  border-right: 1px solid var(--border);
+}}
+/* Sidebar widgets keep the theme's text colour. `!important` is deliberate:
+   Streamlit's own `[data-testid="stSidebar"] *` selectors paint secondary
+   buttons with the framework's light-grey body colour, which on the dark
+   canvas leaves the label barely readable. */
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] a,
+[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] {{
+  color: var(--fg) !important;
+}}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {{
+  color: var(--fg-muted) !important;
+}}
+
+/* the decoration tile around the inline SVG mark */
+.cca-brand-mark {{ color: #FFFFFF; }}
 [data-testid="stSidebarNav"] {{ display: none; }}
 
 /* ---------- glass panels ---------- */
@@ -155,6 +205,220 @@ a {{ color: var(--accent); }}
   backdrop-filter: blur(18px) saturate(140%);
   box-shadow: 0 18px 44px -28px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.05);
   padding: 18px 20px;
+}}
+
+/* ---------- login page ----------
+   A hero banner carrying the artwork, then one glass card holding the form.
+   Every class below is emitted only by render_login() / components.banner(),
+   so nothing here can shift another view. */
+
+/* A faint blue aurora over the wallpaper. Kept deliberately weak: the campus
+   image already carries the neon wave, and a stronger wash hid the building. */
+.cca-login-aurora {{
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(680px 420px at 14% 8%, rgba(8,124,255,0.10), transparent 62%),
+    radial-gradient(560px 380px at 86% 12%, rgba(0,191,255,0.08), transparent 64%);
+  animation: cca-aurora 18s var(--ease-in-out) infinite alternate;
+}}
+@keyframes cca-aurora {{
+  from {{ opacity: 0.75; transform: scale(1) translateY(0); }}
+  to   {{ opacity: 1;    transform: scale(1.06) translateY(-12px); }}
+}}
+@media (prefers-reduced-motion: reduce) {{
+  .cca-login-aurora {{ animation: none; }}
+}}
+
+/* hero banner: copy on the left, artwork on the right.
+   The art column is capped rather than fixed, and the whole grid drops to one
+   column on narrow screens - a hard 340px track left the copy a few characters
+   wide, which wrapped the paragraph into single words per line. */
+.cca-banner {{
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 340px);
+  align-items: center;
+  gap: 26px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  /* translucent, so the campus wallpaper reads through the hero as well */
+  background:
+    radial-gradient(620px 280px at 88% -20%, rgba(8,124,255,0.22), transparent 68%),
+    linear-gradient(135deg, rgba(4,18,46,0.62) 0%, rgba(6,26,58,0.55) 52%, rgba(2,11,32,0.58) 100%);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  padding: 30px 34px;
+  margin-bottom: 18px;
+  box-shadow: 0 26px 60px -40px var(--primary-glow);
+}}
+/* the thin neon seam along the top edge of the banner */
+.cca-banner::before {{
+  content: "";
+  position: absolute;
+  top: 0; left: 8%; right: 8%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--neon), transparent);
+  opacity: 0.9;
+}}
+.cca-banner-copy {{ position: relative; z-index: 1; min-width: 0; }}
+.cca-banner-mark {{
+  display: inline-grid; place-items: center;
+  width: 54px; height: 54px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, var(--primary), var(--neon));
+  color: #FFFFFF;
+  box-shadow: 0 14px 34px -14px var(--primary-glow);
+  margin-bottom: 16px;
+}}
+.cca-banner-eyebrow {{
+  font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--accent); font-weight: 700; margin: 0 0 6px 0;
+}}
+.cca-banner-title {{
+  font-size: 2.5rem; font-weight: 800; line-height: 1.06;
+  letter-spacing: -0.03em; margin: 0 0 8px 0;
+  color: var(--fg);
+}}
+.cca-banner-title .cca-banner-accent {{
+  background: linear-gradient(100deg, var(--neon), var(--accent));
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+}}
+.cca-banner-sub {{
+  font-size: 1.06rem; font-weight: 600; color: var(--accent);
+  margin: 0 0 12px 0;
+}}
+.cca-banner-note {{
+  border-left: 3px solid var(--primary);
+  padding-left: 14px;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--fg-muted);
+  max-width: 58ch;
+  line-height: 1.6;
+}}
+/* the artwork: a real image, so it is a plain <img> with its own glow */
+.cca-banner-art {{
+  position: relative;
+  z-index: 1;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 50px -26px var(--primary-glow);
+  line-height: 0;
+}}
+.cca-banner-art img {{
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}}
+/* the robot mascot, shown small beside the sidebar brand */
+.cca-mascot {{
+  display: block;
+  width: 100%;
+  max-width: 210px;
+  margin: 14px auto 4px auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 40px -26px var(--primary-glow);
+}}
+.cca-mascot-caption {{
+  text-align: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  margin: 0 0 10px 0;
+}}
+
+/* the login card.
+   The form IS the card: styling [data-testid="stForm"] directly avoids the
+   sibling-selector trick that left the widgets outside the panel. The heading
+   above it is its own small block with matching side borders. */
+.cca-login-card {{
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(10,30,66,0.92), rgba(4,16,40,0.94));
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 30px 70px -40px var(--primary-glow), inset 0 1px 0 rgba(255,255,255,0.06);
+  padding: 26px 30px 8px 30px;
+  margin-bottom: 14px;
+}}
+.cca-login-head {{
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 6px;
+}}
+.cca-login-head .cca-login-icon {{
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  border-radius: 13px;
+  background: linear-gradient(135deg, var(--primary), var(--neon));
+  color: #FFFFFF;
+  box-shadow: 0 12px 28px -14px var(--primary-glow);
+  flex: 0 0 auto;
+}}
+.cca-login-title {{
+  font-size: 1.7rem; font-weight: 700; color: var(--fg);
+  margin: 0; letter-spacing: -0.02em;
+}}
+.cca-login-lede {{
+  font-size: 0.9rem; color: var(--fg-muted);
+  margin: 0 0 4px 0; line-height: 1.55;
+}}
+.cca-role-label {{
+  font-size: 0.82rem; font-weight: 600; color: var(--fg);
+  margin: 14px 0 8px 0;
+}}
+
+/* the form panel itself */
+[data-testid="stForm"] {{
+  background: linear-gradient(180deg, rgba(10,30,66,0.66), rgba(4,16,40,0.72)) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg) !important;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 30px 70px -40px var(--primary-glow), inset 0 1px 0 rgba(255,255,255,0.06);
+  padding: 24px 30px 26px 30px !important;
+}}
+[data-testid="stForm"] [data-testid="stTextInput"] > div > div {{
+  border-radius: var(--radius-sm) !important;
+  min-height: 46px !important;
+  border-color: var(--border) !important;
+}}
+[data-testid="stForm"] [data-testid="stTextInput"] > div > div:focus-within {{
+  border-color: var(--neon) !important;
+  box-shadow: 0 0 0 3px var(--primary-soft), 0 0 22px -6px var(--primary-glow) !important;
+}}
+[data-testid="stFormSubmitButton"] button {{
+  min-height: 48px !important;
+  border-radius: var(--radius-sm) !important;
+  font-weight: 700 !important;
+  font-size: 1rem !important;
+  letter-spacing: 0.01em;
+  background: linear-gradient(135deg, var(--primary), var(--primary-2)) !important;
+  border: none !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 16px 36px -18px var(--primary-glow) !important;
+}}
+[data-testid="stFormSubmitButton"] button:hover {{
+  background: linear-gradient(135deg, var(--primary-2), var(--neon)) !important;
+  box-shadow: 0 18px 42px -16px var(--primary-glow) !important;
+}}
+
+/* footer row under the card: two real outlined buttons */
+.cca-login-foot {{ margin-top: 0; }}
+.cca-login-foot ~ div .stButton > button,
+.cca-login-card ~ div .stButton > button {{
+  min-height: 42px;
+  border-radius: var(--radius-sm);
 }}
 
 /* ---------- brand ---------- */
@@ -171,7 +435,7 @@ a {{ color: var(--accent); }}
   border-radius: 12px;
   display: grid; place-items: center;
   background: linear-gradient(135deg, var(--primary), var(--violet));
-  box-shadow: 0 8px 22px -10px rgba(47,107,255,0.9);
+  box-shadow: 0 8px 22px -10px var(--primary-glow);
   flex: 0 0 auto;
 }}
 .cca-brand-name {{
@@ -179,6 +443,29 @@ a {{ color: var(--accent); }}
   line-height: 1.15; color: var(--fg);
 }}
 .cca-brand-sub {{ font-size: 0.72rem; color: var(--fg-muted); letter-spacing: 0.02em; }}
+.cca-brand-name, .cca-brand-sub {{ color: var(--fg); }}
+.cca-brand-sub {{ color: var(--fg-muted); }}
+
+/* ---------- nav pill rendered beside the real button ----------
+   app.py draws the real st.button; this pill is the visible affordance and
+   is styled from the same selector Streamlit gives the button row, so the two
+   cannot drift apart in colour or size. */
+.cca-nav-row {{
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; margin: -2px 0 6px 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--fg);
+  font-size: 0.9rem;
+  font-weight: 500;
+}}
+.cca-nav-row[data-active="true"] {{
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  border-color: transparent;
+  color: #FFFFFF;
+  box-shadow: 0 12px 28px -16px var(--primary-glow);
+}}
 
 /* ---------- nav ---------- */
 .cca-nav-label {{
@@ -244,8 +531,8 @@ a {{ color: var(--accent); }}
   border-top-left-radius: 6px;
 }}
 .cca-bubble-user {{
-  background: linear-gradient(135deg, rgba(47,107,255,0.30), rgba(109,74,255,0.26));
-  border-color: rgba(122,146,214,0.42);
+  background: linear-gradient(135deg, rgba(47, 107, 255, 0.30), rgba(122, 92, 255, 0.26));
+  border-color: var(--border-strong);
   border-top-right-radius: 6px;
 }}
 .cca-answer {{
@@ -266,10 +553,10 @@ a {{ color: var(--accent); }}
   font-size: 0.73rem; font-weight: 600;
   border: 1px solid transparent;
 }}
-.cca-badge--good {{ background: rgba(52,211,153,0.14); color: #6EE7B7; border-color: rgba(52,211,153,0.32); }}
-.cca-badge--warn {{ background: rgba(251,191,36,0.14); color: #FCD34D; border-color: rgba(251,191,36,0.32); }}
-.cca-badge--info {{ background: rgba(47,107,255,0.16); color: #A5BEFF; border-color: rgba(47,107,255,0.34); }}
-.cca-badge--danger {{ background: rgba(248,113,113,0.14); color: #FCA5A5; border-color: rgba(248,113,113,0.32); }}
+.cca-badge--good {{ background: var(--success-soft); color: #6EE7B7; border-color: var(--success); }}
+.cca-badge--warn {{ background: var(--warning-soft); color: #FCD34D; border-color: var(--warning); }}
+.cca-badge--info {{ background: var(--primary-soft); color: var(--fg); border-color: var(--primary-soft-strong); }}
+.cca-badge--danger {{ background: var(--danger-soft); color: #FCA5A5; border-color: var(--danger); }}
 
 /* ---------- buttons ---------- */
 .stButton > button, .stDownloadButton > button {{
@@ -293,8 +580,55 @@ a {{ color: var(--accent); }}
 .stButton > button[kind="primary"] {{
   background: linear-gradient(135deg, var(--primary), var(--primary-2));
   border-color: transparent;
-  color: #FFFFFF;
-  box-shadow: 0 12px 28px -14px rgba(47,107,255,0.95);
+  color: #FFFFFF !important;
+  box-shadow: 0 12px 28px -14px var(--primary-glow);
+}}
+/* children of a primary button must not fall back to the theme foreground */
+.stButton > button[kind="primary"] *,
+.stButton > button[kind="primary"] p {{
+  color: #FFFFFF !important;
+}}
+
+/* ---------- segmented control (the login role switch) ----------
+   Streamlit does not render these as .stButton. Each option is a BaseButton
+   whose testid is built from its kind: `stBaseButton-segmented_control`, and
+   `stBaseButton-segmented_controlActive` for the selected one. Targeting
+   [data-testid="stButtonGroup"] button missed them, which is why the role
+   switch kept rendering as two bare labels. */
+[data-testid="stButtonGroup"] {{
+  gap: 10px !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin-bottom: 4px;
+}}
+[data-testid="stBaseButton-segmented_control"],
+[data-testid="stBaseButton-segmented_controlActive"] {{
+  border-radius: 999px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--input-bg) !important;
+  color: var(--fg-muted) !important;
+  padding: 10px 26px !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+  transition: border-color 180ms var(--ease-out), background 180ms var(--ease-out),
+              color 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
+}}
+[data-testid="stBaseButton-segmented_control"]:hover {{
+  border-color: var(--neon) !important;
+  color: var(--fg) !important;
+  background: var(--surface-hover) !important;
+}}
+[data-testid="stBaseButton-segmented_controlActive"] {{
+  background: linear-gradient(135deg, var(--primary), var(--neon)) !important;
+  border-color: transparent !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 10px 26px -12px var(--primary-glow) !important;
+}}
+/* the option label follows the pill colour, never the global foreground */
+[data-testid="stBaseButton-segmented_control"] *,
+[data-testid="stBaseButton-segmented_controlActive"] * {{
+  color: inherit !important;
+  font-weight: 600 !important;
 }}
 
 /* ---------- inputs ---------- */
@@ -318,7 +652,7 @@ input::placeholder, textarea::placeholder {{ color: var(--fg-dim) !important; }}
 [data-testid="stTextInput"] button {{ color: var(--fg-muted) !important; }}
 [data-baseweb="input"]:focus-within, [data-baseweb="select"] > div:focus-within {{
   border-color: var(--primary) !important;
-  box-shadow: 0 0 0 3px rgba(47,107,255,0.22) !important;
+  box-shadow: 0 0 0 3px var(--primary-soft-strong) !important;
 }}
 
 [data-testid="stChatInput"] {{
@@ -332,19 +666,33 @@ input::placeholder, textarea::placeholder {{ color: var(--fg-dim) !important; }}
 }}
 [data-testid="stChatInput"] textarea {{ color: var(--fg) !important; }}
 [data-testid="stChatInput"] textarea::placeholder {{ color: var(--fg-dim) !important; }}
-[data-testid="stChatInput"] button:hover {{ background-color: rgba(47,107,255,0.18) !important; }}
+[data-testid="stChatInput"] button:hover {{ background-color: var(--primary-soft) !important; }}
 
-/* Segmented control (role switch) */
-[data-testid="stSegmentedControl"] button,
+/* Voice microphone button styling in chat */
+div[data-testid="stPopover"] button {{
+  border-radius: 999px !important;
+  font-weight: 600 !important;
+  border: 1px solid var(--border-strong) !important;
+  background: linear-gradient(135deg, rgba(8, 38, 83, 0.85), rgba(6, 26, 58, 0.95)) !important;
+  color: var(--neon) !important;
+  box-shadow: 0 4px 16px -4px var(--primary-glow) !important;
+  transition: all 200ms ease !important;
+}}
+div[data-testid="stPopover"] button:hover {{
+  border-color: var(--neon) !important;
+  color: #FFFFFF !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px -4px var(--primary-glow) !important;
+}}
+
+
+/* Older baseweb button-group markup, still matched for any component that
+   emits it. The segmented-control pills themselves are styled in the buttons
+   section above, where they can win the cascade over .stButton. */
 [data-baseweb="button-group"] button {{
   background: var(--input-bg) !important;
   color: var(--fg-muted) !important;
   border-color: var(--border) !important;
-}}
-[data-testid="stSegmentedControl"] button[aria-checked="true"],
-[data-baseweb="button-group"] button[aria-pressed="true"] {{
-  background: linear-gradient(135deg, var(--primary), var(--primary-2)) !important;
-  color: #FFFFFF !important;
 }}
 
 /* ---------- tabs ---------- */
@@ -363,7 +711,7 @@ input::placeholder, textarea::placeholder {{ color: var(--fg-dim) !important; }}
   background: transparent !important;
 }}
 [data-baseweb="tab"][aria-selected="true"] {{
-  background: linear-gradient(135deg, rgba(47,107,255,0.9), rgba(109,74,255,0.85)) !important;
+  background: linear-gradient(135deg, var(--primary-glow), var(--primary-2)) !important;
   color: #FFFFFF !important;
 }}
 [data-baseweb="tab-highlight"], [data-baseweb="tab-border"] {{ display: none; }}
@@ -383,7 +731,7 @@ input::placeholder, textarea::placeholder {{ color: var(--fg-dim) !important; }}
 }}
 [data-testid="stMainMenu"] button:hover,
 [data-testid="stMainMenuButton"]:hover {{
-  background: rgba(47,107,255,0.18) !important;
+  background: var(--primary-soft) !important;
 }}
 
 /* the menu panel itself */
@@ -413,14 +761,14 @@ div[role="menuitem"]:hover,
 li[role="menuitem"]:hover,
 div[data-testid="stMainMenu"] li:hover,
 div[role="menu"] li:hover {{
-  background: rgba(47,107,255,0.22) !important;
+  background: var(--primary-soft-strong) !important;
 }}
 /* keyboard shortcuts shown on the right of a menu row */
 div[role="menuitem"] kbd,
 div[data-testid="stMainMenu"] kbd,
 div[role="menu"] kbd {{
   color: var(--fg-dim) !important;
-  background: rgba(122,146,214,0.16) !important;
+  background: var(--border) !important;
   border: 1px solid var(--border) !important;
   border-radius: 6px !important;
 }}
@@ -436,10 +784,10 @@ div[data-baseweb="menu"] div[role="option"] {{
 div[role="option"]:hover,
 li[role="option"]:hover,
 div[data-baseweb="select"] li:hover {{
-  background: rgba(47,107,255,0.22) !important;
+  background: var(--primary-soft-strong) !important;
 }}
 div[role="option"][aria-selected="true"] {{
-  background: rgba(47,107,255,0.34) !important;
+  background: var(--primary-soft-strong) !important;
   color: #FFFFFF !important;
 }}
 
@@ -449,6 +797,146 @@ div[data-baseweb="popover"] {{
   background: var(--surface-solid) !important;
   color: var(--fg) !important;
   border-radius: var(--radius-sm) !important;
+}}
+
+/* ---------- FORCE TEXT VISIBILITY IN DARK MODE ----------
+   Ensure ALL text elements use the correct colors regardless of Streamlit's
+   internal styling. This catches forms, markdown, metrics, and other widgets. */
+.stApp[data-theme="dark"],
+.stApp:not([data-theme="light"]) {{
+  color-scheme: dark;
+}}
+
+/* Form containers and all their children */
+.stForm, .stForm * {{
+  color: var(--fg) !important;
+}}
+.stForm label, .stForm p, .stForm span, .stForm div {{
+  color: var(--fg) !important;
+}}
+
+/* Markdown and text elements */
+.stMarkdown, .stMarkdown *, .stText, .stText * {{
+  color: var(--fg) !important;
+}}
+
+/* Metrics and KPIs */
+[data-testid="stMetric"], [data-testid="stMetric"] * {{
+  color: var(--fg) !important;
+}}
+
+/* Expanders */
+[data-testid="stExpander"] summary, [data-testid="stExpander"] * {{
+  color: var(--fg) !important;
+}}
+
+/* Captions and help text */
+.stCaption, .stCaption *, [data-testid="stCaptionContainer"] * {{
+  color: var(--fg-muted) !important;
+}}
+
+/* Radio, checkbox, selectbox labels */
+[data-testid="stRadio"] label, [data-testid="stCheckbox"] label, 
+[data-testid="stSelectbox"] label, [data-testid="stMultiselect"] label {{
+  color: var(--fg) !important;
+}}
+
+/* Generic form submit buttons (register, staff login, settings).
+   `--fg` is pure white in this palette, so a submit button that is NOT primary
+   must keep a visible surface behind its label or the text disappears. The
+   primary variant is painted by the gradient below and needs no text override -
+   `color: #FFFFFF` here was fighting the button's own background. */
+.stFormSubmitButton button {{
+  color: var(--fg) !important;
+  background: var(--input-bg) !important;
+  border: 1px solid var(--border) !important;
+}}
+.stFormSubmitButton button[kind="primary"],
+.stFormSubmitButton button[type="primary"] {{
+  background: linear-gradient(135deg, var(--primary), var(--primary-2)) !important;
+  border: none !important;
+  color: #FFFFFF !important;
+}}
+.stFormSubmitButton button[kind="primary"] * {{
+  color: #FFFFFF !important;
+}}
+
+/* Tabs */
+[data-baseweb="tab"] {{
+  color: var(--fg-muted) !important;
+}}
+[data-baseweb="tab"][aria-selected="true"] {{
+  color: #FFFFFF !important;
+}}
+
+/* Alert messages */
+[data-testid="stAlert"] {{
+  color: var(--fg) !important;
+}}
+[data-testid="stAlert"] * {{
+  color: var(--fg) !important;
+}}
+
+/* DataFrame */
+[data-testid="stDataFrame"] {{
+  color: var(--fg) !important;
+}}
+
+/* Chat messages */
+[data-testid="stChatMessage"] {{
+  color: var(--fg) !important;
+}}
+[data-testid="stChatMessage"] * {{
+  color: var(--fg) !important;
+}}
+
+/* Sidebar */
+[data-testid="stSidebar"] {{
+  color: var(--fg) !important;
+}}
+[data-testid="stSidebar"] * {{
+  color: var(--fg) !important;
+}}
+
+/* Button text */
+.stButton button, .stButton button * {{
+  color: var(--fg) !important;
+}}
+.stButton button[kind="primary"], .stButton button[kind="primary"] * {{
+  color: #FFFFFF !important;
+}}
+
+/* Input fields - ensure text is visible */
+input, textarea, select {{
+  color: var(--fg) !important;
+  -webkit-text-fill-color: var(--fg) !important;
+}}
+input::placeholder, textarea::placeholder {{
+  color: var(--fg-dim) !important;
+}}
+
+/* File uploader */
+[data-testid="stFileUploaderDropzone"] {{
+  color: var(--fg-muted) !important;
+}}
+[data-testid="stFileUploaderDropzone"] * {{
+  color: var(--fg-muted) !important;
+}}
+
+/* Audio */
+[data-testid="stAudioInput"], [data-testid="stAudio"] {{
+  color: var(--fg) !important;
+}}
+
+/* Code blocks */
+code, pre {{
+  color: var(--fg) !important;
+  background: var(--surface-solid) !important;
+}}
+
+/* Links */
+a {{
+  color: var(--accent) !important;
 }}
 
 /* ---------- unanswered table (styled HTML, not st.dataframe) ---------- */
@@ -478,11 +966,11 @@ table.cca-table th {{
 table.cca-table td {{
   padding: 10px 14px;
   color: var(--fg);
-  border-bottom: 1px solid rgba(122,146,214,0.10);
+  border-bottom: 1px solid rgba(122, 146, 214, 0.12);
   vertical-align: top;
 }}
 table.cca-table tbody tr:last-child td {{ border-bottom: none; }}
-table.cca-table tbody tr:hover td {{ background: rgba(47,107,255,0.08); }}
+table.cca-table tbody tr:hover td {{ background: var(--primary-soft); }}
 .cca-td-ts {{ color: var(--fg-dim) !important; white-space: nowrap; font-variant-numeric: tabular-nums; }}
 .cca-td-conf {{ font-variant-numeric: tabular-nums; }}
 
@@ -520,7 +1008,7 @@ li[role="menuitem"] {{
 [data-testid="stMainMenu"] li:hover,
 [data-baseweb="menu"] li:hover,
 li[role="menuitem"]:hover {{
-  background: rgba(47,107,255,0.22) !important;
+  background: var(--primary-soft-strong) !important;
 }}
 [data-testid="stMainMenu"] hr,
 [data-baseweb="menu"] hr {{
@@ -593,7 +1081,7 @@ audio {{ filter: invert(0.92) hue-rotate(180deg); border-radius: 999px; }}
   position: absolute; inset: -1px;
   border-radius: var(--radius-lg);
   padding: 1px;
-  background: linear-gradient(140deg, rgba(47,107,255,0.75), rgba(139,92,246,0.55), transparent 70%);
+  background: linear-gradient(140deg, rgba(47, 107, 255, 0.75), rgba(139, 92, 246, 0.55), transparent 70%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
           mask-composite: exclude;
@@ -611,7 +1099,7 @@ audio {{ filter: invert(0.92) hue-rotate(180deg); border-radius: 999px; }}
   border-radius: 50%;
   overflow: hidden;
   border: 2px solid rgba(139,92,246,0.55);
-  box-shadow: 0 0 0 4px rgba(47,107,255,0.14), 0 14px 30px -16px rgba(109,74,255,0.9);
+  box-shadow: 0 0 0 4px var(--primary-soft), 0 14px 30px -16px var(--primary-glow);
 }}
 .cca-dev-portrait img {{ width: 100%; height: 100%; object-fit: cover; display: block; }}
 .cca-dev-initial {{
@@ -622,13 +1110,13 @@ audio {{ filter: invert(0.92) hue-rotate(180deg); border-radius: 999px; }}
 .cca-dev-name {{ font-size: 1rem; font-weight: 600; color: var(--fg); margin: 0 0 2px 0; }}
 .cca-dev-role {{
   font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
-  color: #A5BEFF; margin: 0 0 8px 0;
+  color: var(--fg); margin: 0 0 8px 0;
 }}
 .cca-dev-bio {{ font-size: 0.82rem; color: var(--fg-muted); line-height: 1.5; margin: 0; }}
 
 /* ---------- hero ---------- */
 .cca-hero {{
-  background: linear-gradient(135deg, rgba(47,107,255,0.20), rgba(109,74,255,0.14) 55%, rgba(34,211,238,0.10));
+  background: linear-gradient(135deg, var(--primary-soft), rgba(122, 92, 255, 0.14) 55%, rgba(34, 211, 238, 0.10));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 26px 28px;
@@ -638,12 +1126,182 @@ audio {{ filter: invert(0.92) hue-rotate(180deg); border-radius: 999px; }}
 .cca-hero h1 {{ font-size: 1.6rem; margin: 0 0 6px 0; }}
 .cca-hero p {{ margin: 0; color: var(--fg-muted); font-size: 0.92rem; max-width: 62ch; }}
 
+/* ---------- Advanced Futuristic Settings Dashboard Styling ---------- */
+.cca-settings-header {{
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background:
+    radial-gradient(650px 260px at 85% 0%, rgba(0, 191, 255, 0.18), transparent 70%),
+    linear-gradient(135deg, rgba(6, 26, 58, 0.85) 0%, rgba(2, 11, 32, 0.90) 100%);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  padding: 24px 30px;
+  margin-bottom: 18px;
+  box-shadow: 0 20px 48px -20px var(--primary-glow), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}}
+.cca-settings-header::before {{
+  content: "";
+  position: absolute;
+  top: 0; left: 5%; right: 5%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--neon), var(--accent), transparent);
+  opacity: 0.95;
+}}
+.cca-settings-title-row {{
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+}}
+.cca-settings-icon-badge {{
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary), var(--neon));
+  display: grid;
+  place-items: center;
+  color: #FFFFFF;
+  box-shadow: 0 10px 24px -8px var(--primary-glow);
+  flex-shrink: 0;
+}}
+.cca-settings-title {{
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: #FFFFFF;
+  margin: 0;
+  line-height: 1.15;
+}}
+.cca-settings-subtitle {{
+  font-size: 0.93rem;
+  color: var(--fg-muted);
+  margin: 0 0 0 58px;
+  max-width: 75ch;
+  line-height: 1.45;
+}}
+
+/* Quick Center / Futuristic Card Grids */
+.cca-futuristic-card {{
+  position: relative;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: linear-gradient(145deg, rgba(8, 38, 83, 0.55) 0%, rgba(4, 18, 44, 0.70) 100%);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: 0 16px 36px -18px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  padding: 18px 20px;
+  margin-bottom: 14px;
+  transition: all 240ms var(--ease-out);
+}}
+.cca-futuristic-card:hover {{
+  border-color: var(--neon);
+  box-shadow: 0 18px 42px -16px var(--primary-glow);
+  transform: translateY(-2px);
+}}
+.cca-card-head {{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 153, 255, 0.20);
+  padding-bottom: 10px;
+}}
+.cca-card-head-title {{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin: 0;
+}}
+.cca-card-icon {{
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgba(10, 114, 234, 0.35), rgba(0, 191, 255, 0.35));
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  color: var(--neon);
+}}
+
+/* Status indicator dot */
+.cca-dot {{
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}}
+.cca-dot--green {{
+  background: #00E676;
+  box-shadow: 0 0 10px #00E676;
+}}
+.cca-dot--yellow {{
+  background: #FFC107;
+  box-shadow: 0 0 10px #FFC107;
+}}
+.cca-dot--red {{
+  background: #FF5252;
+  box-shadow: 0 0 10px #FF5252;
+}}
+
+/* System Status List Row */
+.cca-status-row {{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  font-size: 0.88rem;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+}}
+.cca-status-row:last-child {{
+  border-bottom: none;
+}}
+.cca-status-key {{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg-muted);
+}}
+.cca-status-val {{
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: #FFFFFF;
+}}
+
+/* Settings Navigation Buttons */
+div[data-testid="stHorizontalBlock"] .cca-cat-btn button {{
+  min-height: 40px !important;
+  font-size: 0.86rem !important;
+  border-radius: 12px !important;
+  letter-spacing: 0.02em;
+}}
+
+
 /* ---------- responsive ---------- */
 @media (max-width: 768px) {{
   .cca-hero {{ padding: 20px 18px; }}
   .cca-hero h1 {{ font-size: 1.3rem; }}
   .cca-kpi-value {{ font-size: 1.5rem; }}
   [data-baseweb="tab"] {{ padding: 6px 12px !important; font-size: 0.85rem !important; }}
+
+  /* the hero banner stacks on a phone: copy first, artwork under it. Without
+     this the two-column grid squeezed the paragraph to a few characters a line. */
+  .cca-banner {{
+    grid-template-columns: 1fr !important;
+    padding: 22px 20px;
+    gap: 18px;
+  }}
+  .cca-banner-title {{ font-size: 1.9rem; }}
+  .cca-banner-sub {{ font-size: 0.98rem; }}
+  .cca-banner-art {{ max-width: 320px; margin: 0 auto; }}
+  .cca-login-card {{ padding: 20px 20px 6px 20px; }}
+  [data-testid="stForm"] {{ padding: 18px 20px 20px 20px !important; }}
 
   /* Nav buttons fill the sidebar width on a phone, which makes each label
      read as a full-width bar. Cap them and left-align the text. */
@@ -711,6 +1369,26 @@ def icon(name: str, size: int = 18, colour: str = "currentColor") -> str:
         "settings": '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
         "check": '<polyline points="20 6 9 17 4 12"/>',
         "clock": '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+        "login": '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>',
+        "user-plus": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>',
+        "cap": '<path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/>',
+        "id-card": '<rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="11" r="2"/><path d="M5 17c0-1.7 1.3-3 3-3s3 1.3 3 3"/><line x1="14" y1="10" x2="19" y2="10"/><line x1="14" y1="14" x2="19" y2="14"/>',
+        "lock": '<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+        "arrow-left": '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+        "sliders": '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+        "brain": '<path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-5.04z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-5.04z"/>',
+        "database": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
+        "activity": '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+        "school": '<path d="m4 6 8-4 8 4"/><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/><path d="M14 22v-4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4"/><path d="M18 5v17"/><path d="M6 5v17"/><circle cx="12" cy="9" r="2"/>',
+        "file-text": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>',
+        "save": '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
+        "rotate-ccw": '<path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+        "server": '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+        "code": '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+        "chevron-right": '<polyline points="9 18 15 12 9 6"/>',
+        "eye": '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+        "globe": '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+        "accessibility": '<circle cx="16" cy="4" r="1"/><path d="m18 19 1-7-6 1"/><path d="m5 8 3-3 5.5 3-2.36 3.5"/><path d="M4.24 14.5a5 5 0 0 0 6.88 6"/><path d="M13.76 17.5a5 5 0 0 0-6.88-6"/>',
     }
     body = paths.get(name, paths["sparkles"])
     return (

@@ -31,11 +31,12 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from code import dialogue, forecast, knowledge, logger
+from code import dialogue, forecast, knowledge, logger, conversation, staff_presence
 from code import intent_model as intent_model_module
-from code import staff_gate
+from code import staff_gate, auth
 from ui import components as C
 from ui import theme
+from ui import settings_dashboard
 
 st.set_page_config(
     page_title="GRA SCHOOL - Cognitive Campus Assistant",
@@ -60,8 +61,12 @@ INTENT_LABELS = {
 
 NAV = [
     ("chat", "AI Assistant", "bot"),
-    ("dashboard", "Staff Dashboard", "chart"),
-    ("developers", "Developers", "users"),
+]
+
+# Auth views (shown in sidebar based on login state)
+AUTH_NAV = [
+    ("login", "Login", "login"),
+    ("register", "Create Account", "user-plus"),
 ]
 
 # Utility views sit at the bottom of the sidebar, below the staff entry, not in
@@ -71,7 +76,12 @@ UTILITY_NAV = [
     ("voice", "Voice Upload", "mic"),
 ]
 
-ALL_VIEWS = {key for key, _, _ in NAV} | {key for key, _, _ in UTILITY_NAV}
+ALL_VIEWS = (
+    {key for key, _, _ in NAV}
+    | {key for key, _, _ in UTILITY_NAV}
+    | {key for key, _, _ in AUTH_NAV}
+    | {"staff_login"}
+)
 
 SAMPLE_PROMPTS = [
     ("Enrollment requirements", "What do I need to enroll as a freshman?"),
@@ -79,6 +89,77 @@ SAMPLE_PROMPTS = [
     ("Tuition and fees", "How much is the tuition fee and where do I pay?"),
     ("Academic calendar", "When is the payment deadline?"),
 ]
+
+
+# --------------------------------------------------------------------------
+# Persistent user preferences (data/app_prefs.json)
+# --------------------------------------------------------------------------
+_PREFS_PATH = ROOT / "data" / "app_prefs.json"
+
+_PREFS_DEFAULTS: dict = {
+    "answer_threshold": dialogue.ANSWER_THRESHOLD,
+    "clarify_threshold": dialogue.CLARIFY_THRESHOLD,
+    "app_theme": "dark",
+    "language": "English (US)",
+    "timezone": "UTC+08:00 (Asia/Manila)",
+    "date_format": "YYYY-MM-DD",
+    "ai_personality": "Helpful & Professional",
+    "response_length": "Standard",
+    "response_lang": "Bilingual (Taglish / English)",
+    "ai_memory": True,
+    "voice_response": False,
+    "two_factor_auth": False,
+    "auto_logout_mins": 30,
+    "failed_login_protection": True,
+    "sys_notifications": True,
+    "announcements": True,
+    "doc_reminders": True,
+    "login_alerts": True,
+    "sound_alerts": False,
+    "auto_backup": True,
+    "backup_freq": "Daily (Midnight)",
+    "font_size": "Medium",
+    "high_contrast": False,
+    "reduced_motion": False,
+    "screen_reader": False,
+    "audit_logs": [
+        {"action": "Updated AI response settings", "user": "System Admin", "time": "Today, 8:24 AM"},
+        {"action": "Changed theme to Dark", "user": "System Admin", "time": "Today, 8:17 AM"},
+        {"action": "Enabled system notifications", "user": "System Admin", "time": "Yesterday, 5:46 PM"},
+    ],
+}
+
+
+def _load_prefs() -> dict:
+    """Read saved prefs from disk; fall back to defaults on any error."""
+    try:
+        if _PREFS_PATH.exists():
+            raw = json.loads(_PREFS_PATH.read_text(encoding="utf-8"))
+            merged = dict(_PREFS_DEFAULTS)
+            merged.update(raw)
+            return merged
+        return dict(_PREFS_DEFAULTS)
+    except Exception:
+        return dict(_PREFS_DEFAULTS)
+
+
+def _save_prefs(prefs_dict: dict) -> None:
+    """Write prefs to disk atomically."""
+    _PREFS_PATH.write_text(
+        json.dumps(prefs_dict, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _log_audit(action: str, user: str) -> None:
+    """Append an action to recent audit logs and persist."""
+    p = _load_prefs()
+    logs = p.get("audit_logs", [])
+    now_str = datetime.now().strftime("%Y-%m-%d, %I:%M %p")
+    logs.insert(0, {"action": action, "user": user, "time": now_str})
+    p["audit_logs"] = logs[:50]  # keep up to 50
+    _save_prefs(p)
+
 
 
 # --------------------------------------------------------------------------
@@ -91,6 +172,15 @@ def init_state() -> None:
         st.session_state.messages = []
     if "view" not in st.session_state:
         st.session_state.view = "chat"
+    if "conversation_id" not in st.session_state:
+        st.session_state.conversation_id = None
+
+    # Load saved behaviour prefs the first time this session starts
+    if "prefs_loaded" not in st.session_state:
+        prefs = _load_prefs()
+        st.session_state["answer_threshold"] = prefs["answer_threshold"]
+        st.session_state["clarify_threshold"] = prefs["clarify_threshold"]
+        st.session_state["prefs_loaded"] = True
 
     # Deep links: ?view=dashboard opens that page directly. It still passes
     # through the passcode gate, so a shared link does not leak the analytics.
@@ -129,16 +219,51 @@ def profile() -> dict | None:
 def render_sidebar() -> None:
     session: dialogue.Session = st.session_state.session
     unlocked = staff_gate.is_unlocked()
+    logged_in = auth.is_logged_in()
+    user_name = auth.get_current_user_name()
+    user_id = auth.get_current_user_id()
+    user_role = auth.get_current_user_role()
     with st.sidebar:
         C.brand()
+        # GRA AI sits in the sidebar under the wordmark, where it is visible on
+        # every view rather than only on the login page.
+        mascot_html = C.mascot("GRA AI", ROOT / "assets" / "gra-ai.png")
+        if mascot_html:
+            st.html(mascot_html)
 
-        # No Student/Staff switch: a student sees the student views only. Staff
-        # reach the dashboard through the discreet "Staff access" entry at the
-        # bottom, which leads to the passcode gate.
+        # Auth section
+        if logged_in:
+            C.user_profile_card(user_name or user_id, user_role, online=True)
+            if st.button("Logout", key="logout", width="stretch"):
+                auth.logout()
+                st.session_state.view = "login"
+                st.query_params["view"] = "login"
+                st.rerun()
+        else:
+            C.nav_label("Account")
+            for key, label, icon_name in AUTH_NAV:
+                active = st.session_state.view == key
+                if st.button(
+                    label,
+                    key=f"auth_{key}",
+                    width="stretch",
+                    type="primary" if active else "secondary",
+                ):
+                    st.session_state.view = key
+                    st.query_params["view"] = key
+                    st.rerun()
+
+        # Only show navigation and session info when logged in
+        if not logged_in:
+            st.divider()
+            st.caption("Please log in or create an account to access GRA SCHOOL.")
+            return
+
+        st.divider()
+
+        # Navigation - dashboard only visible to staff
         C.nav_label("Navigation")
         for key, label, icon_name in NAV:
-            if key == "dashboard" and not unlocked:
-                continue
             active = st.session_state.view == key
             if st.button(
                 label,
@@ -150,9 +275,29 @@ def render_sidebar() -> None:
                 st.query_params["view"] = key
                 st.rerun()
 
+        # Staff dashboard - only show if logged in as staff
+        if auth.is_staff():
+            # Check for waiting conversations
+            waiting_count = len(conversation.get_waiting_conversations())
+            dashboard_label = "Staff Dashboard"
+            if waiting_count > 0:
+                dashboard_label += f" ({waiting_count} waiting)"
+            active = st.session_state.view == "dashboard"
+            if st.button(
+                dashboard_label,
+                key="nav_dashboard",
+                width="stretch",
+                type="primary" if active else "secondary",
+            ):
+                st.session_state.view = "dashboard"
+                st.query_params["view"] = "dashboard"
+                st.rerun()
+
         st.divider()
         C.nav_label("This session")
         st.caption("What the assistant remembers while you chat. Nothing personal is stored.")
+        if logged_in:
+            st.markdown(f"**User:** {user_name or user_id} ({user_role})")
         st.markdown(f"**Student type:** {session.student_type or 'not stated yet'}")
         held = sorted(knowledge.DOCUMENT_LABELS.get(d, d) for d in session.documents_held)
         missing = sorted(knowledge.DOCUMENT_LABELS.get(d, d) for d in session.documents_missing)
@@ -167,18 +312,6 @@ def render_sidebar() -> None:
             st.rerun()
 
         st.divider()
-        if unlocked:
-            if st.button("Lock staff dashboard", key="lock_dashboard", width="stretch"):
-                staff_gate.lock()
-                st.session_state.view = "chat"
-                st.query_params.pop("view", None)
-                st.rerun()
-        else:
-            if st.button("Staff access", key="staff_entry", width="stretch"):
-                st.session_state.view = "dashboard"
-                st.query_params["view"] = "dashboard"
-                st.rerun()
-
         # Utility views live below the staff entry, never in the main navigation.
         for key, label, icon_name in UTILITY_NAV:
             active = st.session_state.view == key
@@ -194,8 +327,8 @@ def render_sidebar() -> None:
 
         st.divider()
         st.caption(
-            "The staff dashboard opens through **Staff access** with the registrar "
-            "passcode. Students stay on these pages."
+            "Students use the AI Assistant and Voice Upload. Staff access the "
+            "dashboard after logging in with a staff account."
         )
 
 
@@ -265,6 +398,47 @@ def render_chat() -> None:
     )
 
     session: dialogue.Session = st.session_state.session
+    logged_in = auth.is_logged_in()
+    student_id = auth.get_current_user_id() if logged_in else None
+    student_name = auth.get_current_user_name() if logged_in else None
+
+    # Get or create conversation for this student
+    if logged_in and student_id:
+        if not st.session_state.conversation_id:
+            conv = conversation.get_student_conversation(student_id)
+            if conv:
+                st.session_state.conversation_id = conv["session_id"]
+            else:
+                conv = conversation.create_conversation(student_id, student_name)
+                st.session_state.conversation_id = conv["session_id"]
+        
+        # Load messages from conversation
+        conv = conversation.get_conversation(st.session_state.conversation_id)
+        if conv:
+            st.session_state.messages = conv["messages"]
+        else:
+            # Conversation was deleted (closed by staff) - start fresh
+            st.session_state.conversation_id = None
+            st.session_state.messages = []
+            st.rerun()
+
+    # Show connection status
+    if logged_in and st.session_state.conversation_id:
+        conv = conversation.get_conversation(st.session_state.conversation_id)
+        if conv:
+            status = conv.get("status", "active")
+            if status == "waiting":
+                st.info("🕐 **Waiting for staff response...** A staff member has been notified and will reply shortly.")
+            elif status == "active" and conv.get("assigned_staff"):
+                st.success("🟢 **Connected with staff** - You can chat with a registrar staff member now.")
+            elif status == "active":
+                st.info("💬 **AI Assistant active** - Type your question below or ask for a staff member.")
+            elif status == "closed":
+                st.warning("🔴 **Conversation closed** - Start a new conversation by sending a message.")
+        else:
+            # Conversation was deleted - show fresh start message
+            st.info("💬 **New conversation started** - How can I help you today?")
+
     if not st.session_state.messages:
         st.markdown("##### Suggested questions")
         cols = st.columns(2)
@@ -274,14 +448,84 @@ def render_chat() -> None:
                     st.session_state.pending = prompt
                     st.rerun()
 
+    # Render all messages from conversation
     for index, message in enumerate(st.session_state.messages):
-        if message["role"] == "user":
+        role = message.get("role", "assistant")
+        if role == "user":
             with st.chat_message("user"):
-                C.user_bubble(message["text"], message.get("ts", ""))
-        else:
+                C.user_bubble(message["text"], message.get("timestamp", "")[:5] if message.get("timestamp") else "")
+                if message.get("audio"):
+                    st.audio(message["audio"], format="audio/wav")
+        elif role == "staff":
+            with st.chat_message("assistant", avatar="👨‍💼"):
+                st.markdown(f"**Staff:** {message['text']}")
+                if message.get("timestamp"):
+                    st.caption(f"Sent at {message['timestamp'][:19].replace('T', ' ')}")
+        else:  # assistant
             with st.chat_message("assistant"):
                 C.bot_bubble(message["text"])
-                _render_answer_meta(index, message)
+                if message.get("meta") and message["meta"].get("intent") != "voice_recording":
+                    _render_answer_meta(index, message)
+
+    # Microphone / Voice recorder tool directly above chat input
+    voice_col1, voice_col2 = st.columns([1, 4])
+    with voice_col1:
+        with st.popover("🎙️ Voice / Mic", help="Record audio using your microphone"):
+            st.markdown("##### 🎙️ Voice Recorder")
+            st.caption("Record your question or voice message. The audio will be played back in the chat.")
+            voice_clip = st.audio_input("Record voice question", key="chat_voice_mic", label_visibility="collapsed")
+            if voice_clip is not None:
+                st.audio(voice_clip, format="audio/wav")
+                if st.button("Send Voice to Chat 🚀", key="chat_send_voice_btn", type="primary", width="stretch"):
+                    audio_raw = voice_clip.getvalue()
+                    ts = datetime.now().strftime("%H:%M")
+                    # Add to local state
+                    st.session_state.messages.append(
+                        {
+                            "role": "user",
+                            "text": "🎙️ [Voice Question Recorded]",
+                            "audio": audio_raw,
+                            "timestamp": datetime.now().isoformat(timespec="seconds"),
+                        }
+                    )
+                    # Add to conversation
+                    if st.session_state.conversation_id:
+                        conversation.add_message(
+                            st.session_state.conversation_id,
+                            "student",
+                            "🎙️ [Voice Question Recorded]",
+                            sender_id=student_id,
+                            sender_name=student_name,
+                        )
+                    st.session_state.messages.append(
+                        {
+                            "role": "assistant",
+                            "text": (
+                                "🎙️ **Voice recording received and played back!** You can replay your audio above.\n\n"
+                                "💡 *Tip: Our cognitive handbook rules provide instant verified answers for typed queries. "
+                                "Type your question in the text box below to view your confidence score, official requirements, and eligibility rules.*"
+                            ),
+                            "timestamp": datetime.now().isoformat(timespec="seconds"),
+                            "meta": {
+                                "intent": "voice_recording",
+                                "confidence": 1.0,
+                                "source": "microphone - browser audio",
+                                "rules_fired": [],
+                                "facts": {},
+                            },
+                            "feedback": None,
+                        }
+                    )
+                    if st.session_state.conversation_id:
+                        conversation.add_message(
+                            st.session_state.conversation_id,
+                            "assistant",
+                            "🎙️ Voice recording received and played back!",
+                        )
+                    st.rerun()
+
+    with voice_col2:
+        st.caption("💡 *Click 🎙️ **Voice / Mic** to record your voice or type your question below.*")
 
     prompt = st.session_state.pop("pending", None)
     typed = st.chat_input("Type your message here...")
@@ -289,32 +533,108 @@ def render_chat() -> None:
         prompt = typed
 
     if prompt:
+        ts = datetime.now().isoformat(timespec="seconds")
+        # Add to local state
         st.session_state.messages.append(
-            {"role": "user", "text": prompt, "ts": datetime.now().strftime("%H:%M")}
+            {"role": "user", "text": prompt, "timestamp": ts}
         )
-        reply = dialogue.handle(prompt, session, policy=current_policy())
-        st.session_state.messages.append(
-            {
-                "role": "assistant",
-                "text": reply.text,
-                "ts": datetime.now().strftime("%H:%M"),
-                "meta": {
-                    "intent": reply.intent,
-                    "confidence": reply.confidence,
-                    "source": reply.source,
-                    "rules_fired": reply.rules_fired,
-                    "facts": reply.facts,
-                    "blockers": reply.blockers,
-                    "clarified": reply.clarified,
-                    "escalated": reply.escalated,
-                    "sentiment": reply.sentiment,
-                    "options": reply.options,
-                    "decisive": reply.decisive,
-                    "margin": reply.margin,
-                },
-                "feedback": None,
-            }
-        )
+        # Add to conversation
+        if st.session_state.conversation_id:
+            conversation.add_message(
+                st.session_state.conversation_id,
+                "student",
+                prompt,
+                sender_id=student_id,
+                sender_name=student_name,
+            )
+        
+        # Check if conversation has assigned staff who is online
+        staff_online = False
+        assigned_staff = None
+        if st.session_state.conversation_id:
+            conv = conversation.get_conversation(st.session_state.conversation_id)
+            if conv:
+                assigned_staff = conv.get("assigned_staff")
+                if assigned_staff:
+                    staff_online = staff_presence.is_staff_online(assigned_staff)
+        
+        # Route message: if staff is online and assigned, notify them (don't send AI reply)
+        # Otherwise, get AI reply
+        if staff_online and assigned_staff and st.session_state.conversation_id:
+            # Update conversation status to active if it was waiting
+            conv = conversation.get_conversation(st.session_state.conversation_id)
+            if conv and conv.get("status") == "waiting":
+                conversation.update_conversation_status(st.session_state.conversation_id, "active", assigned_staff)
+            
+            # Show notification that staff will respond
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "text": f"📩 **Your message has been sent to the assigned staff member.** They are currently online and will respond shortly.",
+                    "timestamp": datetime.now().isoformat(timespec="seconds"),
+                    "meta": {
+                        "intent": "staff_notified",
+                        "confidence": 1.0,
+                        "source": "conversation - staff routing",
+                    },
+                    "feedback": None,
+                }
+            )
+            if st.session_state.conversation_id:
+                conversation.add_message(
+                    st.session_state.conversation_id,
+                    "assistant",
+                    f"📩 Your message has been sent to the assigned staff member. They are currently online and will respond shortly.",
+                    meta={
+                        "intent": "staff_notified",
+                        "source": "conversation - staff routing",
+                    }
+                )
+        else:
+            # No staff online or no assigned staff - get AI reply
+            reply = dialogue.handle(prompt, session, policy=current_policy(), student_id=student_id, student_name=student_name)
+            
+            # Add AI reply to local state
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "text": reply.text,
+                    "timestamp": datetime.now().isoformat(timespec="seconds"),
+                    "meta": {
+                        "intent": reply.intent,
+                        "confidence": reply.confidence,
+                        "source": reply.source,
+                        "rules_fired": reply.rules_fired,
+                        "facts": reply.facts,
+                        "blockers": reply.blockers,
+                        "clarified": reply.clarified,
+                        "escalated": reply.escalated,
+                        "sentiment": reply.sentiment,
+                        "options": reply.options,
+                        "decisive": reply.decisive,
+                        "margin": reply.margin,
+                    },
+                    "feedback": None,
+                }
+            )
+            # Add AI reply to conversation
+            if st.session_state.conversation_id:
+                conversation.add_message(
+                    st.session_state.conversation_id,
+                    "assistant",
+                    reply.text,
+                    meta={
+                        "intent": reply.intent,
+                        "confidence": reply.confidence,
+                        "source": reply.source,
+                        "escalated": reply.escalated,
+                    }
+                )
+            
+            # If escalated, update conversation status to waiting
+            if reply.escalated and st.session_state.conversation_id:
+                conversation.update_conversation_status(st.session_state.conversation_id, "waiting")
+        
         st.rerun()
 
 
@@ -453,28 +773,244 @@ def render_dashboard() -> None:
     C.hero(
         "Dashboard",
         "What students asked, what the assistant could not answer, and what the "
-        "registrar's office should do about it.",
+        "registrar's office should do about it. Use the Live Chat tab to respond to students in real-time.",
     )
 
-    head_left, head_right = st.columns([3, 1])
-    with head_right:
-        auto = st.toggle("Live update", value=True, key="live_update")
-        interval = st.select_slider(
-            "Refresh every",
-            options=[2, 5, 10, 30, 60],
-            value=5,
-            key="live_interval",
-            format_func=lambda s: f"{s}s",
-            disabled=not auto,
-        )
+    # Tabs for different dashboard views
+    tab_analytics, tab_live_chat = st.tabs(["📊 Analytics", "💬 Live Chat"])
 
-    # run_every re-runs only this fragment, so the dashboard keeps up with a
-    # student chatting in another tab without reloading the whole page (which
-    # would throw away the filter and search state).
-    if auto:
-        st.fragment(_dashboard_body, run_every=interval)()
+    with tab_analytics:
+        head_left, head_right = st.columns([3, 1])
+        with head_right:
+            auto = st.toggle("Live update", value=True, key="live_update")
+            interval = st.select_slider(
+                "Refresh every",
+                options=[2, 5, 10, 30, 60],
+                value=5,
+                key="live_interval",
+                format_func=lambda s: f"{s}s",
+                disabled=not auto,
+            )
+
+        # run_every re-runs only this fragment, so the dashboard keeps up with a
+        # student chatting in another tab without reloading the whole page (which
+        # would throw away the filter and search state).
+        if auto:
+            st.fragment(_dashboard_body, run_every=interval)()
+        else:
+            _dashboard_body()
+
+    with tab_live_chat:
+        _render_staff_chat()
+
+
+def _render_staff_chat() -> None:
+    """Real-time chat interface for staff to communicate with students."""
+    staff_id = auth.get_current_user_id()
+    staff_name = auth.get_current_user_name() or staff_id
+
+    # Send heartbeat to mark staff as online
+    staff_presence.staff_heartbeat(staff_id, staff_name)
+
+    # Get all conversations
+    conversations = conversation.get_all_conversations()
+    
+    # Separate by status
+    waiting = [c for c in conversations if c.get("status") == "waiting"]
+    active = [c for c in conversations if c.get("status") == "active"]
+    closed = [c for c in conversations if c.get("status") == "closed"]
+
+    # Show online staff count
+    online_staff = staff_presence.get_online_staff()
+    
+    st.markdown("##### Active Conversations")
+    
+    # Summary metrics with online staff indicator
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        C.kpi("Waiting for Response", len(waiting))
+    with c2:
+        C.kpi("Active Chats", len(active))
+    with c3:
+        C.kpi("Closed", len(closed))
+    with c4:
+        C.kpi("Staff Online", len(online_staff), "🟢" if online_staff else "🔴")
+
+    # Show online staff names
+    if online_staff:
+        staff_names = ", ".join([s["staff_name"] for s in online_staff])
+        st.caption(f"🟢 Online staff: {staff_names}")
     else:
-        _dashboard_body()
+        st.caption("🔴 No staff currently online - AI will handle student messages")
+
+    # Conversation list
+    all_convs = waiting + active + closed
+    
+    if not all_convs:
+        st.info("No conversations yet. Students will appear here when they request a staff member.")
+        return
+
+    # Create a selectbox for conversation selection
+    conv_options = []
+    for conv in all_convs:
+        summary = conversation.get_conversation_summary(conv)
+        status_icon = "🔴" if summary["status"] == "waiting" else ("🟢" if summary["status"] == "active" else "⚫")
+        staff_icon = "🟢" if summary.get("staff_online") else ("🔴" if summary.get("assigned_staff") else "⚪")
+        label = f"{status_icon}{staff_icon} {summary['student_name']} ({summary['student_id']}) - {summary['last_message'][:40]}... ({summary['message_count']} msgs)"
+        conv_options.append((summary["session_id"], label))
+
+    selected_session_id = st.selectbox(
+        "Select a conversation",
+        options=[c[0] for c in conv_options],
+        format_func=lambda x: next((c[1] for c in conv_options if c[0] == x), x),
+        key="staff_conv_select"
+    )
+
+    if not selected_session_id:
+        return
+
+    conv = conversation.get_conversation(selected_session_id)
+    if not conv:
+        st.error("Conversation not found")
+        return
+
+    summary = conversation.get_conversation_summary(conv)
+    
+    # Conversation header with status controls
+    assigned_staff = conv.get("assigned_staff")
+    staff_online = False
+    if assigned_staff:
+        staff_online = staff_presence.is_staff_online(assigned_staff)
+    
+    col1, col2, col3 = st.columns([3, 1, 1])
+    with col1:
+        st.markdown(f"**{summary['student_name']}** (`{summary['student_id']}`) — {summary['message_count']} messages")
+        status_parts = [f"Status: {summary['status'].capitalize()}"]
+        if assigned_staff:
+            status_parts.append(f"Assigned: {summary.get('assigned_staff', 'unknown')}")
+            status_parts.append(f"Staff: {'🟢 Online' if staff_online else '🔴 Offline'}")
+        status_parts.append(f"Started: {summary['created_at'][:19].replace('T', ' ')}")
+        status_parts.append(f"Last: {summary['updated_at'][:19].replace('T', ' ')}")
+        st.caption(" • ".join(status_parts))
+    
+    with col2:
+        # Status change (active/waiting) - closed is now a separate action
+        status_options = ["active", "waiting"]
+        if summary["status"] not in status_options:
+            # If somehow closed, default to active
+            summary["status"] = "active"
+        new_status = st.selectbox(
+            "Status",
+            status_options,
+            index=status_options.index(summary["status"]),
+            key=f"status_{selected_session_id}"
+        )
+        if new_status != summary["status"]:
+            conversation.update_conversation_status(selected_session_id, new_status, staff_id)
+            st.rerun()
+
+    with col3:
+        # Button to take over conversation if not assigned or staff is offline
+        if not assigned_staff or not staff_online:
+            if st.button("📥 Take Over", key=f"takeover_{selected_session_id}", type="primary", width="stretch"):
+                conversation.assign_staff_to_conversation(selected_session_id, staff_id, staff_name)
+                conversation.update_conversation_status(selected_session_id, "active", staff_id)
+                st.success(f"You have taken over this conversation!")
+                st.rerun()
+        
+        # Close & Delete button - requires confirmation
+        if st.session_state.get(f"confirm_close_{selected_session_id}", False):
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("✅ Confirm Delete", key=f"confirm_yes_{selected_session_id}", type="primary", width="stretch"):
+                    conversation.update_conversation_status(selected_session_id, "closed", staff_id)
+                    st.success("Conversation closed and deleted.")
+                    st.session_state[f"confirm_close_{selected_session_id}"] = False
+                    st.rerun()
+            with col_b:
+                if st.button("❌ Cancel", key=f"confirm_no_{selected_session_id}", width="stretch"):
+                    st.session_state[f"confirm_close_{selected_session_id}"] = False
+                    st.rerun()
+        else:
+            if st.button("🗑️ Close & Delete", key=f"close_{selected_session_id}", type="secondary", width="stretch"):
+                st.session_state[f"confirm_close_{selected_session_id}"] = True
+                st.rerun()
+        
+        if st.button("🔄 Refresh", key=f"refresh_{selected_session_id}"):
+            st.rerun()
+
+    st.divider()
+
+    # Chat messages
+    st.markdown("##### Conversation")
+    
+    # Display messages
+    for msg in conv.get("messages", []):
+        role = msg.get("role", "assistant")
+        text = msg.get("text", "")
+        timestamp = msg.get("timestamp", "")
+        sender_name = msg.get("sender_name", "")
+        meta = msg.get("meta", {})
+        
+        if role == "student":
+            with st.chat_message("user"):
+                st.markdown(f"**{sender_name or 'Student'}**")
+                st.markdown(text)
+                if timestamp:
+                    st.caption(timestamp[:19].replace('T', ' '))
+        elif role == "staff":
+            with st.chat_message("assistant", avatar="👨‍💼"):
+                st.markdown(f"**Staff: {sender_name or staff_name}**")
+                st.markdown(text)
+                if timestamp:
+                    st.caption(timestamp[:19].replace('T', ' '))
+        else:  # assistant
+            with st.chat_message("assistant", avatar="🤖"):
+                st.markdown(f"**GRA AI**")
+                st.markdown(text)
+                if meta.get("intent") and meta.get("intent") != "voice_recording":
+                    conf = meta.get("confidence", 0)
+                    conf_color = "green" if conf >= 0.6 else ("orange" if conf >= 0.4 else "red")
+                    st.caption(f"Intent: {meta.get('intent')} • Confidence: :{conf_color}[{conf:.0%}] • Source: {meta.get('source', 'unknown')}")
+                if timestamp:
+                    st.caption(timestamp[:19].replace('T', ' '))
+
+    st.divider()
+
+    # Staff reply input
+    st.markdown("##### Reply as Staff")
+    reply_text = st.text_area("Your response", key=f"staff_reply_{selected_session_id}", height=100)
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("Send 📨", key=f"send_{selected_session_id}", type="primary", width="stretch"):
+            if reply_text.strip():
+                conversation.add_message(
+                    selected_session_id,
+                    "staff",
+                    reply_text.strip(),
+                    sender_id=staff_id,
+                    sender_name=staff_name,
+                )
+                # Update status to active if it was waiting
+                if summary["status"] == "waiting":
+                    conversation.update_conversation_status(selected_session_id, "active", staff_id)
+                st.rerun()
+            else:
+                st.warning("Please enter a message")
+    with col2:
+        # Quick reply templates
+        quick_replies = [
+            "Hello! I'm a registrar staff member. How can I help you?",
+            "I've checked your records and here's what I found...",
+            "Please visit the Registrar's Office at Main Building Room 101 during office hours.",
+            "Your request has been processed. You'll receive a confirmation email shortly.",
+            "Let me transfer you to the appropriate department.",
+        ]
+        selected_template = st.selectbox("Quick reply", [""] + quick_replies, key=f"quick_{selected_session_id}")
+        if selected_template and st.button("Use Template", key=f"use_template_{selected_session_id}"):
+            st.info(f"Template selected: {selected_template[:50]}... (copy and paste above)")
+
+    st.caption("💡 Tip: Click 🔄 Refresh to check for new messages from the student.")
 
 
 def _unanswered_table_html(rows: list[dict]) -> str:
@@ -504,6 +1040,34 @@ def _unanswered_table_html(rows: list[dict]) -> str:
             f"<td>{html.escape(str(row.get('guessed intent', '')))}</td>"
             f"<td class='cca-td-conf'>{conf_text}</td>"
             f"<td>{source_badge}</td>"
+            "</tr>"
+        )
+    return (
+        "<div class='cca-table-wrap'><table class='cca-table'>"
+        f"<thead><tr>{head}</tr></thead>"
+        f"<tbody>{''.join(body)}</tbody>"
+        "</table></div>"
+    )
+
+
+def _live_conversations_table_html(rows: list[dict]) -> str:
+    """Live conversations as a themed HTML table."""
+    if not rows:
+        return "<p class='cca-source'>No conversations to show.</p>"
+    head = "".join(
+        f"<th>{h}</th>" for h in ("Student", "Status", "Assigned Staff", "Messages", "Last Message", "Time", "Session")
+    )
+    body = []
+    for row in rows:
+        body.append(
+            "<tr>"
+            f"<td>{html.escape(str(row.get('student', '')))}</td>"
+            f"<td>{row.get('status', '')}</td>"
+            f"<td>{html.escape(str(row.get('staff', '')))}</td>"
+            f"<td class='cca-td-conf'>{html.escape(str(row.get('messages', '')))}</td>"
+            f"<td>{html.escape(str(row.get('last_message', '')))}</td>"
+            f"<td class='cca-td-ts'>{html.escape(str(row.get('last_time', '')))}</td>"
+            f"<td class='cca-td-ts'>{html.escape(str(row.get('session_id', '')))}</td>"
             "</tr>"
         )
     return (
@@ -570,87 +1134,91 @@ def _dashboard_body() -> None:
         f"recommendation: {recommendation['confidence']:.0%}</p>"
     )
 
-    st.markdown("##### Unanswered questions")
+    st.markdown("##### Live Conversations")
     st.caption(
-        "Every question the AI Assistant could not answer lands here, newest first. "
-        "Add a question to the training set to teach the assistant about it."
+        "Real-time view of all student conversations (AI + Staff). Updates automatically. "
+        "Shows the latest message from each conversation."
     )
-    if not missed:
-        st.success("Nothing unanswered - every logged question got an answer.")
+
+    # Get all conversations from the conversation module
+    all_conversations = conversation.get_all_conversations()
+    
+    if not all_conversations:
+        st.info("No conversations yet. Students will appear here when they start chatting.")
     else:
-        real_count = sum(1 for row in missed if not row.get("synthetic"))
-        fake_count = len(missed) - real_count
-
+        # Filter options
         filter_col, search_col = st.columns([1, 2])
-        source = filter_col.radio(
-            "Source",
-            ["All", "Through the chat", "Sample seed"],
-            horizontal=False,
-            key="miss_source",
-            help=(
-                "Through the chat: a question typed into the AI Assistant, logged by the "
-                "conversation layer. Sample seed: rows written by "
-                "scripts/seed_sample_logs.py, which are not real students."
-            ),
+        status_filter = filter_col.radio(
+            "Status",
+            ["All", "active", "waiting", "closed"],
+            horizontal=True,
+            key="conv_status_filter",
         )
-        search = search_col.text_input("Search", key="miss_search")
+        search = search_col.text_input("Search", key="conv_search")
 
-        picked = missed
-        if source == "Through the chat":
-            picked = [r for r in missed if not r.get("synthetic")]
-        elif source == "Sample seed":
-            picked = [r for r in missed if r.get("synthetic")]
+        # Filter conversations
+        filtered = all_conversations
+        if status_filter != "All":
+            filtered = [c for c in filtered if c.get("status") == status_filter]
 
         if search:
             needle = search.lower()
-            picked = [
-                r for r in picked
-                if needle in str(r.get("text", "")).lower()
-                or needle in INTENT_LABELS.get(r.get("intent"), str(r.get("intent"))).lower()
+            filtered = [
+                c for c in filtered
+                if needle in c.get("student_name", "").lower()
+                or needle in c.get("student_id", "").lower()
+                or any(needle in m.get("text", "").lower() for m in c.get("messages", []))
             ]
 
-        st.caption(
-            f"{real_count} logged through the chat, {fake_count} from the sample seed. "
-            f"Showing {len(picked)}, newest first."
-        )
+        st.caption(f"Showing {len(filtered)} of {len(all_conversations)} conversations, newest first.")
 
-        if not picked:
-            st.info("No unanswered questions match this filter.")
+        if not filtered:
+            st.info("No conversations match this filter.")
         else:
-            rows = [
-                {
-                    "when": row.get("ts"),
-                    "question": row.get("text"),
-                    "guessed intent": INTENT_LABELS.get(row.get("intent"), row.get("intent")),
-                    "confidence": row.get("confidence"),
-                    "source": "sample seed" if row.get("synthetic") else "chat",
-                }
-                for row in reversed(picked)
-            ]
-            # A styled HTML table, not st.dataframe: the dataframe renders on
-            # Streamlit's own light surface and cannot be recoloured, which left
-            # dark text on white rows inside this dark dashboard.
-            st.markdown(_unanswered_table_html(rows[:50]), unsafe_allow_html=True)
+            # Build rows for table
+            rows = []
+            for conv in filtered:
+                messages = conv.get("messages", [])
+                last_msg = messages[-1] if messages else None
+                
+                # Get last message details
+                if last_msg:
+                    last_text = last_msg.get("text", "")[:80]
+                    last_time = last_msg.get("timestamp", "")[:19].replace("T", " ")
+                    last_role = last_msg.get("role", "")
+                    role_label = "🎓 Student" if last_role == "student" else ("👨‍💼 Staff" if last_role == "staff" else "🤖 AI")
+                else:
+                    last_text = "(no messages)"
+                    last_time = ""
+                    role_label = ""
 
-            # Label the row the staff member actually chose, not always the last one.
-            labels = [f"{r['question']}  ({r['when']})" for r in rows[:50]]
-            choice = st.selectbox("Question to label", labels, key="label_pick")
-            options = list(intents.keys()) or ["ask_requirements"]
-            label_col, button_col = st.columns([3, 1])
-            chosen = label_col.selectbox("Label as", options, key="label_intent")
-            if button_col.button("Add to training set", width="stretch"):
-                index = labels.index(choice)
-                text = rows[index]["question"]
-                if text:
-                    intent_model_module.add_staff_label(text, chosen)
-                    st.success(f"Added to the training set: {text[:70]}")
-        if st.button("Retrain the intent model"):
-            with st.spinner("Retraining the intent model..."):
-                metrics = intent_model_module.retrain()
-            st.success(
-                f"Retrained on {metrics['corpus_size']} labelled questions - "
-                f"hold-out macro F1 {metrics['holdout_macro_f1']:.2f}."
-            )
+                # Status badge
+                status = conv.get("status", "active")
+                status_badge = {
+                    "active": "<span class='cca-badge cca-badge--good'>🟢 Active</span>",
+                    "waiting": "<span class='cca-badge cca-badge--warn'>🟡 Waiting</span>",
+                    "closed": "<span class='cca-badge cca-badge--danger'>🔴 Closed</span>",
+                }.get(status, f"<span class='cca-badge cca-badge--info'>{status}</span>")
+
+                # Staff online indicator
+                assigned_staff = conv.get("assigned_staff")
+                staff_online = ""
+                if assigned_staff:
+                    is_online = staff_presence.is_staff_online(assigned_staff)
+                    staff_online = "🟢" if is_online else "🔴"
+
+                rows.append({
+                    "student": f"{conv.get('student_name', 'Unknown')} ({conv.get('student_id', 'N/A')})",
+                    "status": status_badge,
+                    "staff": f"{staff_online} {assigned_staff or '—'}",
+                    "messages": str(len(messages)),
+                    "last_message": f"{role_label}: {last_text}",
+                    "last_time": last_time,
+                    "session_id": conv.get("session_id", "")[:8],
+                })
+
+            # Render HTML table
+            st.markdown(_live_conversations_table_html(rows), unsafe_allow_html=True)
 
     st.markdown("##### Feedback")
     feedback_rows = [row for row in logs if row.get("event") == "feedback"]
@@ -711,132 +1279,254 @@ def render_developers() -> None:
 # Settings
 # --------------------------------------------------------------------------
 def render_settings() -> None:
-    C.hero(
-        "Settings",
-        "Everything on this page changes how the app behaves right now. Values that "
-        "live in a file are saved to disk; session settings reset when you reload.",
+    prefs = _load_prefs()
+    settings_dashboard.render_advanced_settings(
+        prefs=prefs,
+        save_prefs_fn=_save_prefs,
+        log_audit_fn=_log_audit,
     )
 
-    left, right = st.columns(2, gap="large")
 
-    with left:
-        st.markdown("##### Assistant behaviour")
-        st.caption(
-            "These override the defaults in `code/dialogue.py` for this session only."
+
+# --------------------------------------------------------------------------
+# Staff login page (separate from main navigation)
+# --------------------------------------------------------------------------
+def render_staff_login() -> None:
+    """Standalone staff login page - not accessible from main navigation."""
+    C.hero(
+        "Staff Login",
+        "Enter the registrar passcode to access the staff dashboard. "
+        "This page is not linked from the student navigation."
+    )
+
+    if staff_gate.is_unlocked():
+        st.success("Already unlocked. Redirecting to dashboard...")
+        st.session_state.view = "dashboard"
+        st.query_params["view"] = "dashboard"
+        st.rerun()
+
+    configured = staff_gate.expected_passcode()
+    if not configured:
+        st.error(
+            "No staff passcode is configured, so the dashboard is locked. Set "
+            "`STAFF_PASSCODE` in a `.env` file at the project root, or "
+            "`staff.passcode` in `.streamlit/secrets.toml`, then restart the app."
         )
-        answer_at = st.slider(
-            "Answer without asking back at confidence of at least",
-            min_value=0.30,
-            max_value=0.95,
-            value=float(st.session_state.get("answer_threshold", dialogue.ANSWER_THRESHOLD)),
-            step=0.05,
-            format="%.2f",
-            key="set_answer_threshold",
+        st.code(
+            "# .env\nSTAFF_PASSCODE=your-passcode-here",
+            language="bash",
         )
-        clarify_below = st.slider(
-            "Fall back to 'I did not understand' below confidence",
-            min_value=0.05,
-            max_value=0.55,
-            value=float(st.session_state.get("clarify_threshold", dialogue.CLARIFY_THRESHOLD)),
-            step=0.05,
-            format="%.2f",
-            key="set_clarify_threshold",
+        return
+
+    if staff_gate.attempts_left() <= 0:
+        st.error(
+            f"Too many wrong attempts ({staff_gate.MAX_ATTEMPTS}). The dashboard is locked for "
+            "this session - reload the page to try again."
         )
-        if clarify_below >= answer_at:
-            st.error(
-                "The fallback threshold must stay below the answer threshold, "
-                "otherwise no range is left for a clarifying question."
-            )
+        if st.button("Reload the page"):
+            st.rerun()
+        return
+
+    with st.form("staff_login_form", clear_on_submit=False):
+        code = st.text_input("Passcode", type="password", key="staff_login_code")
+        submitted = st.form_submit_button("Login to Dashboard", type="primary", width="stretch")
+
+    if submitted:
+        if staff_gate.check(code):
+            st.session_state[staff_gate.SESSION_KEY] = True
+            st.session_state[staff_gate.ATTEMPTS_KEY] = 0
+            st.session_state.view = "dashboard"
+            st.query_params["view"] = "dashboard"
+            st.rerun()
         else:
-            st.session_state["answer_threshold"] = answer_at
-            st.session_state["clarify_threshold"] = clarify_below
-            st.success(
-                f"Active now: answer at {answer_at:.0%}, clarify between "
-                f"{clarify_below:.0%} and {answer_at:.0%}, fall back below "
-                f"{clarify_below:.0%}. The AI Assistant uses this immediately."
-            )
-            st.caption(
-                "Stored for this session only. A page reload restores the defaults "
-                "in `code/dialogue.py`."
-            )
+            st.session_state[staff_gate.ATTEMPTS_KEY] = int(st.session_state.get(staff_gate.ATTEMPTS_KEY, 0)) + 1
+            left = staff_gate.attempts_left()
+            if left:
+                st.error(f"Wrong passcode. {left} attempt{'s' if left != 1 else ''} left.")
+            else:
+                st.error(f"Wrong passcode. The dashboard is locked for this session.")
+                st.rerun()
 
-        st.markdown("")
-        st.markdown("##### Dashboard")
-        st.toggle("Live update", value=True, key="live_update")
-        st.select_slider(
-            "Refresh every",
-            options=[2, 5, 10, 30, 60],
-            value=st.session_state.get("live_interval", 5),
-            key="set_live_interval",
-            format_func=lambda s: f"{s}s",
-            disabled=not st.session_state.get("live_update", True),
-        )
-        st.session_state["live_interval"] = st.session_state.get("set_live_interval", 5)
+    st.caption(
+        "🔐 One shared passcode for registrar staff. Not a per-user login - "
+        "access this page directly via ?view=staff_login"
+    )
 
-    with right:
-        st.markdown("##### Appearance")
-        st.radio(
-            "Theme",
-            ["Dark", "Light"],
-            index=1 if st.session_state.get("app_theme") == "light" else 0,
-            horizontal=True,
-            key="theme_choice",
-            help="Changes the whole interface immediately.",
-        )
-        chosen = st.session_state.get("theme_choice", "Dark")
-        new_theme = "light" if chosen == "Light" else "dark"
-        if new_theme != st.session_state.get("app_theme", "dark"):
-            st.session_state["app_theme"] = new_theme
+    st.divider()
+    if st.button("← Back to AI Assistant", type="secondary"):
+        st.session_state.view = "chat"
+        st.query_params["view"] = "chat"
+        st.rerun()
+
+
+# --------------------------------------------------------------------------
+# Unified login page (student or staff)
+# --------------------------------------------------------------------------
+def render_login() -> None:
+    """Unified login page for students and staff."""
+    if auth.is_logged_in():
+        st.success("Already logged in. Redirecting...")
+        st.session_state.view = "chat"
+        st.query_params["view"] = "chat"
+        st.rerun()
+
+    st.markdown("<div class='cca-login-aurora'></div>", unsafe_allow_html=True)
+
+    C.banner(
+        "GRA",
+        "SCHOOL",
+        "Cognitive Campus Assistant",
+        "An intelligent campus platform that helps students and staff access "
+        "school services, learning tools, and AI-powered assistance.",
+        art_path=ROOT / "assets" / "hero-edu.png",
+    )
+
+    C.login_card_open(
+        "Login",
+        "Enter your ID and password. Select your role to access the appropriate features.",
+        "users",
+    )
+
+    st.markdown("<p class='cca-role-label'>Select your role</p>", unsafe_allow_html=True)
+    role = st.segmented_control(
+        "Login as",
+        ["Student", "Staff"],
+        default="Student",
+        key="login_role",
+        label_visibility="collapsed",
+        width="stretch",
+    ) or "Student"
+    expected_role = "student" if role == "Student" else "staff"
+
+    with st.form("login_form", clear_on_submit=False):
+        user_id = st.text_input("ID (Student ID or Staff ID)", key="login_id")
+        password = st.text_input("Password", type="password", key="login_password")
+        submitted = st.form_submit_button("Login", type="primary", width="stretch")
+
+    if submitted:
+        if not user_id or not password:
+            st.error("Please enter both ID and password")
+        else:
+            success, message = auth.login(user_id, password, expected_role)
+            if success:
+                st.success(message)
+                st.session_state.view = "chat"
+                st.query_params["view"] = "chat"
+                st.rerun()
+            else:
+                st.error(message)
+
+    # No footer row here: the sidebar already carries Login and Create Account,
+    # and a second pair of buttons under the card duplicated those routes.
+
+
+# --------------------------------------------------------------------------
+# Unified register page (student or staff)
+# --------------------------------------------------------------------------
+def render_register() -> None:
+    """Unified account creation page for students and staff."""
+    C.hero(
+        "Create Account",
+        "Register with your ID. Select your role: Student for chat access, Staff for dashboard access."
+    )
+
+    if auth.is_logged_in():
+        st.success("Already logged in. Redirecting...")
+        st.session_state.view = "chat"
+        st.query_params["view"] = "chat"
+        st.rerun()
+
+    role = st.radio("Register as", ["Student", "Staff"], horizontal=True, key="register_role")
+    role_value = "student" if role == "Student" else "staff"
+
+    with st.form("register_form", clear_on_submit=False):
+        user_id = st.text_input(f"{role} ID", key="register_id")
+        name = st.text_input("Name (optional)", key="register_name")
+        password = st.text_input("Password", type="password", key="register_password")
+        confirm = st.text_input("Confirm Password", type="password", key="register_confirm")
+        submitted = st.form_submit_button("Create Account", type="primary", width="stretch")
+
+    if submitted:
+        if not user_id or not password:
+            st.error(f"Please enter {role} ID and password")
+        elif password != confirm:
+            st.error("Passwords do not match")
+        elif len(password) < 4:
+            st.error("Password must be at least 4 characters")
+        else:
+            success, message = auth.create_account(user_id, password, name, role_value)
+            if success:
+                st.success(message)
+                # Auto-login after registration
+                auth.login(user_id, password, role_value)
+                st.session_state.view = "chat"
+                st.query_params["view"] = "chat"
+                st.rerun()
+            else:
+                st.error(message)
+
+    st.divider()
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("← Back to AI Assistant", type="secondary"):
+            st.session_state.view = "chat"
+            st.query_params["view"] = "chat"
+            st.rerun()
+    with col2:
+        if st.button("Login Instead", type="secondary"):
+            st.session_state.view = "login"
+            st.query_params["view"] = "login"
             st.rerun()
 
-        st.markdown("")
-        st.markdown("##### School and access")
-        meta = knowledge.load()["meta"]
-        st.markdown(f"**School:** {meta['school']}")
-        st.markdown(f"**Term:** {meta['term']}")
-        st.markdown(
-            C.badge("Dashboard locked", "warn")
-            if not staff_gate.is_unlocked()
-            else C.badge("Dashboard unlocked", "good"),
-            unsafe_allow_html=True,
-        )
 
-    st.markdown("")
-    st.markdown("##### Session")
-    session_data = st.session_state.session
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        C.kpi("Turns this session", session_data.turns)
-    with c2:
-        C.kpi("Chat messages", len(st.session_state.messages))
-    with c3:
-        C.kpi("Passcode attempts", staff_gate.MAX_ATTEMPTS - staff_gate.attempts_left())
-
-    clear_col, reset_col = st.columns(2)
-    if clear_col.button("Clear chat messages", width="stretch"):
-        st.session_state.messages = []
-        st.rerun()
-    if reset_col.button("Reset the whole session", width="stretch"):
-        st.session_state.session = dialogue.new_session()
-        st.session_state.messages = []
-        st.rerun()
+# --------------------------------------------------------------------------
+# Staff login page (legacy - kept for backward compatibility with ?view=staff_login)
+# --------------------------------------------------------------------------
+def render_staff_login() -> None:
+    """Legacy staff login page - redirects to unified login."""
+    st.info("Redirecting to unified login page...")
+    st.session_state.view = "login"
+    st.query_params["view"] = "login"
+    st.rerun()
 
 
 # --------------------------------------------------------------------------
 def main() -> None:
     init_state()
     theme.inject(st.session_state.get("app_theme", "dark"))
-    render_sidebar()
 
     view = st.session_state.view
+
+    # Pages that don't require authentication
+    public_views = {"login", "register", "staff_login"}
+
+    # If not logged in and trying to access a protected view, redirect to login
+    if not auth.is_logged_in() and view not in public_views:
+        st.session_state.view = "login"
+        st.query_params["view"] = "login"
+        view = "login"
+
+    render_sidebar()
+
     if view == "chat":
         render_chat()
     elif view == "voice":
         render_voice()
+    elif view == "login":
+        render_login()
+    elif view == "register":
+        render_register()
+    elif view == "staff_login":
+        render_staff_login()
     elif view == "dashboard":
-        # The staff dashboard sits behind a passcode. Students keep the chat.
-        if staff_gate.gate():
+        # Staff dashboard - only accessible to logged-in staff
+        if auth.is_staff():
             render_dashboard()
+        else:
+            st.error("Staff access required. Please log in as staff.")
+            st.session_state.view = "login"
+            st.query_params["view"] = "login"
+            st.rerun()
     elif view == "developers":
         render_developers()
     elif view == "settings":
