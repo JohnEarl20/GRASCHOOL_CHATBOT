@@ -15,3 +15,4 @@ joblib==1.5.3
 openpyxl==3.1.5      # reads the starter corpus, which is an .xlsx with a .csv name
 altair==6.0.0        # the dashboard charts (st.line_chart renders to canvas and
                      # cannot be recoloured by CSS, so the charts are Altair SVG)
+psutil==7.2.1        # system uptime and resource status in the settings dashboard
