@@ -10,9 +10,27 @@ type Conversation = { id: string; title: string; updated_at: string };
 type View = "chat" | "voice" | "dashboard" | "settings";
 
 export default function Home() {
-  const [supabase] = useState(() => {
-    try { return createSupabaseBrowserClient(); } catch { return null; }
+  const [supabaseConfig] = useState(() => {
+    const missing = [
+      !process.env.NEXT_PUBLIC_SUPABASE_URL && "NEXT_PUBLIC_SUPABASE_URL",
+      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    ].filter(Boolean);
+    if (missing.length) {
+      return {
+        client: null,
+        error: `Hindi kasama sa deployment ang: ${missing.join(", ")}.`,
+      };
+    }
+    try {
+      return { client: createSupabaseBrowserClient(), error: "" };
+    } catch {
+      return {
+        client: null,
+        error: "Hindi valid ang Supabase URL. Kopyahin muli ang eksaktong Project URL mula sa Supabase Connect panel.",
+      };
+    }
   });
+  const supabase = supabaseConfig.client;
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -189,7 +207,7 @@ export default function Home() {
   }
 
   if (loading) return <main className="center-screen"><div className="spinner" /><p>Inihahanda ang GRA SCHOOL assistant…</p></main>;
-  if (!supabase) return <main className="center-screen"><section className="auth-card"><Logo /><h1>Kailangan ng setup</h1><p>I-configure ang Supabase URL at anon key sa environment variables ng Vercel.</p></section></main>;
+  if (!supabase) return <main className="center-screen"><section className="auth-card"><Logo /><h1>Kailangan ng setup</h1><p>{supabaseConfig.error}</p><p className="small-note">Sa Vercel, ilagay ang mga variable sa environment na ito at gumawa ng bagong deployment. Hindi ipinapakita ang secret values dito.</p></section></main>;
   if (!user || !profile) return (
     <main className="auth-screen">
       <section className="auth-card">
