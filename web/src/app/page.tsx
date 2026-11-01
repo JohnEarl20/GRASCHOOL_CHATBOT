@@ -33,6 +33,7 @@ export default function Home() {
   const supabase = supabaseConfig.client;
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileError, setProfileError] = useState("");
   const [mode, setMode] = useState<"login" | "register">("login");
   const [view, setView] = useState<View>("chat");
   const [loading, setLoading] = useState(true);
@@ -61,9 +62,20 @@ export default function Home() {
       setLoading(false);
       return;
     }
-    const { data } = await supabase.from("profiles").select("id, student_id, full_name, role, preferences").eq("id", nextUser.id).single();
+    const { data, error: queryError } = await supabase
+      .from("profiles")
+      .select("id, student_id, full_name, role, preferences")
+      .eq("id", nextUser.id)
+      .maybeSingle();
+    if (queryError) {
+      setProfile(null);
+      setProfileError(`Hindi mabasa ang profile mula sa Supabase: ${queryError.message}`);
+      setLoading(false);
+      return;
+    }
     const nextProfile = data as Profile | null;
     setProfile(nextProfile);
+    setProfileError(nextProfile ? "" : "Walang profile row para sa naka-login na account.");
     if (typeof nextProfile?.preferences?.answer_threshold === "number") setThreshold(nextProfile.preferences.answer_threshold);
     setLoading(false);
   }, [supabase]);
@@ -75,7 +87,7 @@ export default function Home() {
     }
     supabase.auth.getUser().then(({ data }) => loadAccount(data.user));
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      void loadAccount(session?.user ?? null);
+      window.setTimeout(() => void loadAccount(session?.user ?? null), 0);
     });
     return () => listener.subscription.unsubscribe();
   }, [loadAccount, supabase]);
@@ -191,11 +203,36 @@ export default function Home() {
     } catch { setError("Hindi ma-access ang mikropono. Payagan ang microphone permission o mag-upload ng audio file."); }
   }
 
-  async function loadDashboard() {
-    if (!supabase || !profile || profile.role !== "staff") return;
-    const { data, error: queryError } = await supabase.from("chat_events").select("answered, created_at").order("created_at", { ascending: false }).limit(500);
-    if (queryError) { setError(queryError.message); return; }
-    const rows = data ?? [];
+  async function openDashboard() {
+    if (!supabase || !user) return;
+    setError("");
+    const { data, error: queryError } = await supabase
+      .from("profiles")
+      .select("id, student_id, full_name, role, preferences")
+      .eq("id", user.id)
+      .single();
+    if (queryError) {
+      setError(`Hindi ma-verify ang staff access: ${queryError.message}`);
+      return;
+    }
+    const currentProfile = data as Profile;
+    setProfile(currentProfile);
+    if (currentProfile.role !== "staff") {
+      setView("settings");
+      setError(`Student pa ang role ng account ${currentProfile.student_id}. Kailangan itong itakda sa staff sa Supabase public.profiles bago mabuksan ang dashboard.`);
+      return;
+    }
+    setView("dashboard");
+    const { data: events, error: eventsError } = await supabase
+      .from("chat_events")
+      .select("answered, created_at")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (eventsError) {
+      setError(`Na-verify ang staff role, pero hindi mabasa ang dashboard data: ${eventsError.message}`);
+      return;
+    }
+    const rows = events ?? [];
     setSummary({ total: rows.length, answered: rows.filter((row) => row.answered).length, recent: [] });
   }
 
@@ -211,6 +248,15 @@ export default function Home() {
   if (!user || !profile) return (
     <main className="auth-screen">
       <section className="auth-card">
+        {user && !profile ? <>
+          <Logo />
+          <p className="eyebrow">ACCOUNT PROFILE</p>
+          <h1>Hindi ma-load ang profile</h1>
+          <p className="error">{profileError || "Hindi makita ang profile record sa Supabase."}</p>
+          <p className="small-note">Tiyaking na-run ang schema sa parehong Supabase project na nakakabit sa Vercel. Kung lumang account ito, maaaring wala itong profile row.</p>
+          <button className="primary-button" onClick={() => { setLoading(true); void loadAccount(user); }}>Subukang muli</button>
+          <button className="text-button" onClick={logout}>Mag-log out</button>
+        </> : <>
         <Logo />
         <p className="eyebrow">COGNITIVE CAMPUS ASSISTANT</p>
         <h1>{mode === "login" ? "Magandang araw." : "Gumawa ng student account"}</h1>
@@ -229,6 +275,7 @@ export default function Home() {
           {mode === "login" ? "Wala pang account? Mag-register" : "May account na? Mag-login"}
         </button>
         <p className="small-note">Student account muna ang bagong registration. Staff access ay itinatalaga ng administrator.</p>
+        </>}
       </section>
     </main>
   );
@@ -241,7 +288,7 @@ export default function Home() {
         <nav className="nav-list">
           <button className={view === "chat" ? "nav-item active" : "nav-item"} onClick={() => setView("chat")}>✦ <span>AI Assistant</span></button>
           <button className={view === "voice" ? "nav-item active" : "nav-item"} onClick={() => setView("voice")}>◉ <span>Voice Upload</span></button>
-          {profile.role === "staff" && <button className={view === "dashboard" ? "nav-item active" : "nav-item"} onClick={() => { setView("dashboard"); void loadDashboard(); }}>▦ <span>Staff Dashboard</span></button>}
+          <button className={view === "dashboard" ? "nav-item active" : "nav-item"} onClick={() => void openDashboard()}>▦ <span>{profile.role === "staff" ? "Staff Dashboard" : "Dashboard access"}</span></button>
           <button className={view === "settings" ? "nav-item active" : "nav-item"} onClick={() => setView("settings")}>⚙ <span>Settings</span></button>
         </nav>
         <div className="sidebar-bottom"><p>Student services · English · Filipino · Taglish</p><button className="text-button" onClick={logout}>Mag-log out</button></div>
@@ -265,7 +312,7 @@ export default function Home() {
           </section>
         </div>}
         {view === "voice" && <section className="content-page"><p className="eyebrow">RECORD & PLAY</p><h1>Voice Upload</h1><p className="muted">Mag-record o mag-upload ng audio para mapakinggan. Walang speech-to-text; i-type ang tanong sa AI Assistant.</p><div className="voice-card"><button className={recording ? "record-button recording" : "record-button"} onClick={toggleRecording}>{recording ? "■ Ihinto ang recording" : "● Magsimulang mag-record"}</button><label className="upload-button">Mag-upload ng audio<input type="file" accept="audio/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) setRecordingUrl(URL.createObjectURL(file)); }} /></label>{recordingUrl && <audio controls src={recordingUrl} />}</div></section>}
-        {view === "dashboard" && <section className="content-page"><p className="eyebrow">STAFF ONLY</p><h1>Staff Dashboard</h1>{profile.role !== "staff" ? <p className="error">Walang pahintulot sa staff dashboard.</p> : <><p className="muted">Chat activity at response status sa database.</p><div className="metrics"><div><small>Chat events</small><strong>{summary?.total ?? "—"}</strong></div><div><small>Nasagot</small><strong>{summary ? `${summary.answered}` : "—"}</strong></div><div><small>Answer rate</small><strong>{summary && summary.total ? `${Math.round(summary.answered / summary.total * 100)}%` : "—"}</strong></div></div><button className="secondary-button" onClick={() => void loadDashboard()}>I-refresh ang metrics</button></>}</section>}
+        {view === "dashboard" && <section className="content-page"><p className="eyebrow">STAFF ONLY</p><h1>Staff Dashboard</h1>{profile.role !== "staff" ? <p className="error">Walang pahintulot sa staff dashboard.</p> : <><p className="muted">Chat activity at response status sa database.</p><div className="metrics"><div><small>Chat events</small><strong>{summary?.total ?? "—"}</strong></div><div><small>Nasagot</small><strong>{summary ? `${summary.answered}` : "—"}</strong></div><div><small>Answer rate</small><strong>{summary && summary.total ? `${Math.round(summary.answered / summary.total * 100)}%` : "—"}</strong></div></div><button className="secondary-button" onClick={() => void openDashboard()}>I-refresh ang metrics</button></>}</section>}
         {view === "settings" && <section className="content-page"><p className="eyebrow">PREFERENCES</p><h1>Settings</h1><p className="muted">Account: {user.email} · {profile.role === "staff" ? "Staff" : "Student"}</p><div className="settings-card"><label>Answer confidence threshold <strong>{Math.round(threshold * 100)}%</strong><input type="range" min="40" max="90" value={Math.round(threshold * 100)} onChange={(event) => setThreshold(Number(event.target.value) / 100)} /></label><button className="secondary-button" onClick={() => void saveThreshold()}>I-save ang preference</button><small>Nai-save ang preference sa iyong profile; ang chat ay gumagamit pa ng default policy sa kasalukuyan.</small></div></section>}
       </section>
     </main>
