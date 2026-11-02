@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -57,10 +58,40 @@ def _save_conversation(conv: dict) -> None:
             tmp.rename(path)
 
 
-def create_conversation(student_id: str, student_name: str | None = None) -> dict:
+def _next_message_timestamp(conv: dict) -> str:
+    """Return a timestamp strictly later than the previous message."""
+    now = datetime.now()
+    messages = conv.get("messages", [])
+    if messages:
+        previous_value = messages[-1].get("timestamp")
+        if previous_value:
+            try:
+                previous = datetime.fromisoformat(previous_value)
+                if previous.tzinfo is not None:
+                    now = datetime.now(previous.tzinfo)
+                if now <= previous:
+                    now = previous + timedelta(microseconds=1)
+            except (TypeError, ValueError):
+                pass
+    return now.isoformat(timespec="microseconds")
+
+
+def create_conversation(
+    student_id: str,
+    student_name: str | None = None,
+    session_id: str | None = None,
+) -> dict:
     """Create a new conversation for a student."""
-    session_id = uuid.uuid4().hex[:12]
-    now = datetime.now().isoformat(timespec="seconds")
+    from code import auth
+
+    if not auth.is_student() or auth.get_current_user_id() != student_id:
+        raise PermissionError("Only a student can create their own conversation.")
+    session_id = session_id or uuid.uuid4().hex[:12]
+    if not re.fullmatch(r"[a-f0-9]{12}", session_id):
+        raise ValueError("Conversation ID must be 12 lowercase hexadecimal characters.")
+    if _conv_path(session_id).exists():
+        raise ValueError("A conversation with this ID already exists.")
+    now = datetime.now().isoformat(timespec="microseconds")
     conv = {
         "session_id": session_id,
         "student_id": student_id,
@@ -80,17 +111,79 @@ def get_conversation(session_id: str) -> dict | None:
     return _load_conversation(session_id)
 
 
+def delete_conversation(session_id: str) -> bool:
+    """Permanently delete one conversation and its logged inquiry rows."""
+    from code import auth
+
+    if not auth.is_staff():
+        raise PermissionError("Only authorized staff can delete student conversations.")
+    return _permanently_delete_conversation(session_id)
+
+
+def delete_own_conversation(session_id: str) -> bool:
+    """Allow a student to permanently delete only their own conversation."""
+    from code import auth
+
+    if not auth.is_student():
+        raise PermissionError("Only the student who owns a conversation can delete it.")
+    if not isinstance(session_id, str) or not re.fullmatch(r"[a-f0-9]{12}", session_id):
+        raise ValueError("Invalid conversation ID.")
+    student_id = auth.get_current_user_id()
+    conv = _load_conversation(session_id)
+    if not student_id or not conv or conv.get("student_id") != student_id:
+        raise PermissionError("You can only delete your own conversations.")
+    return _permanently_delete_conversation(session_id)
+
+
+def _permanently_delete_conversation(session_id: str) -> bool:
+    if not isinstance(session_id, str) or not re.fullmatch(r"[a-f0-9]{12}", session_id):
+        raise ValueError("Invalid conversation ID.")
+    path = _conv_path(session_id)
+    if not path.is_file():
+        return False
+    deleting_path = path.with_suffix(".deleting")
+    if deleting_path.exists():
+        raise OSError("This conversation is already being deleted.")
+
+    try:
+        os.replace(path, deleting_path)
+        from code import logger
+
+        logger.delete_session_logs(session_id)
+        deleting_path.unlink()
+    except OSError:
+        if deleting_path.exists() and not path.exists():
+            os.replace(deleting_path, path)
+        raise
+    return True
+
+
 def get_student_conversation(student_id: str) -> dict | None:
-    """Get the active conversation for a student."""
+    """Get the newest non-resolved conversation for a student."""
+    return next(
+        (
+            conv for conv in get_student_conversations(student_id)
+            if conv.get("status") in {"active", "waiting"}
+        ),
+        None,
+    )
+
+
+def get_student_conversations(student_id: str) -> list[dict]:
+    """Get conversation history for one student, newest first."""
+    if not student_id:
+        return []
     _ensure_dir()
+    conversations = []
     for path in CONV_DIR.glob("*.json"):
         try:
             conv = json.loads(path.read_text(encoding="utf-8"))
-            if conv.get("student_id") == student_id and conv.get("status") == "active":
-                return conv
+            if conv.get("student_id") == student_id:
+                conversations.append(conv)
         except (json.JSONDecodeError, OSError):
             continue
-    return None
+    conversations.sort(key=lambda conv: conv.get("updated_at", ""), reverse=True)
+    return conversations
 
 
 def get_all_conversations() -> list[dict]:
@@ -109,12 +202,38 @@ def get_all_conversations() -> list[dict]:
 
 
 def add_message(session_id: str, role: str, text: str, sender_id: str | None = None, sender_name: str | None = None, meta: dict | None = None) -> dict | None:
-    """Add a message to a conversation."""
+    """Append a role-authorized message to a conversation."""
+    from code import auth
+
     conv = _load_conversation(session_id)
     if not conv:
         return None
+    if role not in {"student", "assistant", "staff"}:
+        raise ValueError("Message role must be student, assistant, or staff.")
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("Message text cannot be empty.")
+    if conv.get("status") == "closed":
+        raise ValueError("Resolved conversations are read-only.")
 
-    now = datetime.now().isoformat(timespec="seconds")
+    current_user_id = auth.get_current_user_id()
+    if role == "staff":
+        if (
+            not auth.is_staff()
+            or not current_user_id
+            or sender_id != current_user_id
+        ):
+            raise PermissionError("Only the authenticated staff member can reply as staff.")
+    elif role in {"student", "assistant"}:
+        if (
+            not auth.is_student()
+            or not current_user_id
+            or conv.get("student_id") != current_user_id
+        ):
+            raise PermissionError("Only the student who owns this conversation can add messages.")
+        if role == "student" and sender_id and sender_id != current_user_id:
+            raise PermissionError("Student messages must use the authenticated student's ID.")
+
+    now = _next_message_timestamp(conv)
     msg = {
         "id": uuid.uuid4().hex[:8],
         "role": role,  # "student", "assistant", "staff"
@@ -127,10 +246,7 @@ def add_message(session_id: str, role: str, text: str, sender_id: str | None = N
     conv["messages"].append(msg)
     conv["updated_at"] = now
 
-    # Update status based on role
-    if role == "student" and conv["status"] == "closed":
-        conv["status"] = "active"
-    elif role == "staff":
+    if role == "staff":
         conv["status"] = "active"
         conv["assigned_staff"] = sender_id
 
@@ -139,25 +255,34 @@ def add_message(session_id: str, role: str, text: str, sender_id: str | None = N
 
 
 def update_conversation_status(session_id: str, status: str, staff_id: str | None = None) -> dict | None:
-    """Update conversation status (active, waiting, closed).
-    
-    When status is 'closed', the conversation file is deleted.
-    """
+    """Update conversation status while retaining the record for staff history."""
+    from code import auth
+
     conv = _load_conversation(session_id)
     if not conv:
         return None
-    
-    if status == "closed":
-        # Delete the conversation file
-        path = _conv_path(session_id)
-        if path.exists():
-            path.unlink()
-        return {"session_id": session_id, "status": "closed", "deleted": True}
-    
+    if status not in {"active", "waiting", "closed"}:
+        raise ValueError("Conversation status must be active, waiting, or closed.")
+    current_user_id = auth.get_current_user_id()
+    if auth.is_staff():
+        if not current_user_id:
+            raise PermissionError("A signed-in staff account is required.")
+        if staff_id and staff_id != current_user_id:
+            raise PermissionError("Staff can only update status as their own account.")
+        staff_id = current_user_id
+    elif (
+        not auth.is_student()
+        or current_user_id != conv.get("student_id")
+        or status != "waiting"
+    ):
+        raise PermissionError("Only staff can change this conversation status.")
+    if conv.get("status") == "closed" and status != "closed":
+        raise ValueError("Resolved conversations cannot be reopened.")
+
     conv["status"] = status
     if staff_id:
         conv["assigned_staff"] = staff_id
-    conv["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    conv["updated_at"] = datetime.now().isoformat(timespec="microseconds")
     _save_conversation(conv)
     return conv
 
@@ -235,10 +360,15 @@ def get_available_staff() -> list[dict]:
 
 def assign_staff_to_conversation(session_id: str, staff_id: str, staff_name: str | None = None) -> dict | None:
     """Assign a staff member to a conversation."""
+    from code import auth
+
+    if not auth.is_staff() or auth.get_current_user_id() != staff_id:
+        raise PermissionError("Only an authenticated staff member can assign themselves.")
     conv = get_conversation(session_id)
-    if not conv:
+    if not conv or conv.get("status") == "closed":
         return None
     conv["assigned_staff"] = staff_id
-    conv["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    conv["status"] = "active"
+    conv["updated_at"] = datetime.now().isoformat(timespec="microseconds")
     _save_conversation(conv)
     return conv

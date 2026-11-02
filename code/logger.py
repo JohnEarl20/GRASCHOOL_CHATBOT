@@ -8,6 +8,7 @@ confidence, whether it was answered, the rules that fired and the feedback.
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -46,3 +47,36 @@ def read_logs() -> list[dict]:
 def clear_logs() -> None:
     if LOG_PATH.exists():
         LOG_PATH.unlink()
+
+
+def delete_session_logs(session_id: str) -> int:
+    """Remove inquiry-log records for one conversation without changing other rows."""
+    if not session_id:
+        raise ValueError("A conversation ID is required.")
+    if not LOG_PATH.exists():
+        return 0
+
+    kept_lines = []
+    removed = 0
+    for line in LOG_PATH.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True):
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            kept_lines.append(line)
+            continue
+        if isinstance(row, dict) and row.get("session_id") == session_id:
+            removed += 1
+        else:
+            kept_lines.append(line)
+
+    temporary_path = LOG_PATH.with_name(f"{LOG_PATH.name}.tmp")
+    try:
+        temporary_path.write_text("".join(kept_lines), encoding="utf-8")
+        os.replace(temporary_path, LOG_PATH)
+    except OSError:
+        try:
+            temporary_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+    return removed

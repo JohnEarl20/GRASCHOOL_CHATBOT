@@ -45,7 +45,11 @@ def _hash_password(password: str) -> str:
 
 def create_account(user_id: str, password: str, name: str = "", role: str = "student") -> tuple[bool, str]:
     """Create a new account. Returns (success, message)."""
+    user_id = user_id.strip()
     users = _load_users()
+
+    if not user_id:
+        return False, "ID is required"
 
     if user_id in users:
         return False, f"{role.capitalize()} ID already exists"
@@ -55,6 +59,9 @@ def create_account(user_id: str, password: str, name: str = "", role: str = "stu
 
     if role not in ("student", "staff"):
         return False, "Invalid role"
+
+    if role == "staff" and not is_staff():
+        return False, "Only an authenticated staff member can create staff accounts"
 
     users[user_id] = {
         "password_hash": _hash_password(password),

@@ -51,10 +51,10 @@ The application implements a unified authentication system (`code/auth.py`) with
   - Access to a focused **Settings** view with personalized AI confidence preferences, security/password controls, notification settings, and system monitoring.
 
 - **👨‍🏫 Staff Accounts**:
-  - Access to all student features plus the **Staff Dashboard** (`/?view=dashboard`).
-  - Access to the full **Advanced Futuristic Settings Dashboard** (all 10 management categories, real hardware telemetry, manual/automated database backups, user provisioning, and audit logs).
+  - Access to the staff-only workspace: dashboard, inquiry/support conversations, question review, verified knowledge articles, documents, announcements, analytics, and staff settings.
+  - Only an authenticated staff member can provision another staff account. Public registration creates student accounts only.
 
-Users can create new student or staff accounts directly through the **Create Account** sidebar view.
+Students can register through the **Create Account** sidebar view. Staff accounts are provisioned from the staff-only User Management settings.
 
 ---
 
@@ -130,7 +130,17 @@ User Query (English / Filipino / Taglish)
    - Time-series volume forecasting for peak enrollment periods.
    - Unanswered queries triage table with manual staff review tools.
 
-4. **Advanced Futuristic Settings Dashboard (`/?view=settings`)**:
+4. **Staff Workspace (`/?view=dashboard`)**:
+   - Dark glassmorphism dashboard using the existing GRA campus and mascot artwork.
+   - Analytics & Reports provides period, date, category, status, and staff filters with inquiry trends, category and status charts, weekday activity, KPI comparisons, searchable inquiry records, and activity-based recommendations.
+   - Staff can generate and preview inquiry, AI performance, unanswered, category, staff activity, semester, and operations reports, then download CSV, Excel, or PDF and print the page.
+   - Generated report files and the last 100 report-history entries are stored locally under `data/staff_reports/`, excluded from Git, and report creation is audit-logged.
+   - Question review can add staff labels to the existing training corpus.
+   - Staff-approved knowledge articles are stored locally and are the only newly authored articles used by the assistant.
+   - Staff documents and announcements use local file/JSON storage; published announcements appear in the student assistant.
+   - Verified accuracy and response-time metrics are reported only when corresponding evaluation/timing records exist. No analytics API or relational database is configured; the dashboard uses existing local log and conversation files.
+
+5. **Advanced Futuristic Settings Dashboard (`/?view=settings`)**:
    - Re-designed to match the GRA SCHOOL futuristic educational dashboard design reference.
    - **For Staff**: 10 comprehensive management categories:
      1. *Overview* — Interactive 2-column quick configuration grid.
@@ -148,7 +158,7 @@ User Query (English / Filipino / Taglish)
      - Clean, focused interface containing only relevant categories: *Overview*, *AI Assistant Configuration*, *Security & Password*, *Notifications*, and *System Monitoring*.
      - Preferences persist to `data/app_prefs.json` and automatically reload across sessions.
 
-5. **Developers Page (`/?view=developers`)**:
+6. **Developers Page (`/?view=developers`)**:
    - Profile cards for project developers (John Earl Mirabete and Tristan Napili).
    - Embedded within the Settings workspace for clean navigation.
 
@@ -177,6 +187,7 @@ User Query (English / Filipino / Taglish)
 │   ├── explain.py              # Backward chaining rule-block explainability
 │   ├── logger.py               # JSONL turn logging for analytics
 │   ├── forecast.py             # Altair charts and weekly inquiry volume forecast
+│   ├── analytics_reports.py    # Staff report exports, PDF creation, and report history
 │   └── staff_gate.py           # Legacy registrar passcode gate support
 ├── data/
 │   ├── users.json              # Hashed credentials and user accounts

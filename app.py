@@ -8,12 +8,9 @@ upload page, the staff dashboard, and the developers page.
 Presentation lives in `ui/`; everything about what the assistant knows and
 says lives in `code/`. This file only wires the two together.
 
-There is no login screen on purpose: this project has no authentication
-system, and a password box that accepts anything would be fake security.
-A student sees the student views only. The staff dashboard is reached through
-a discreet "Staff access" entry at the bottom of the sidebar, behind a shared
-passcode read from .env - see code/staff_gate.py for what that does and does
-not protect.
+The application uses the existing role-aware login and file-backed account
+store. Students use the assistant and voice upload; staff-only workspace routes
+are checked against the authenticated staff role before rendering.
 """
 from __future__ import annotations
 
@@ -31,12 +28,13 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from code import dialogue, forecast, knowledge, logger, conversation, staff_presence
+from code import dialogue, forecast, knowledge, logger, conversation, staff_content, staff_presence
 from code import intent_model as intent_model_module
 from code import staff_gate, auth
 from ui import components as C
 from ui import theme
 from ui import settings_dashboard
+from ui import staff_workspace
 
 st.set_page_config(
     page_title="GRA SCHOOL - Cognitive Campus Assistant",
@@ -80,8 +78,20 @@ ALL_VIEWS = (
     {key for key, _, _ in NAV}
     | {key for key, _, _ in UTILITY_NAV}
     | {key for key, _, _ in AUTH_NAV}
-    | {"staff_login"}
+    | {"staff_login", "dashboard_chat"}
 )
+
+STAFF_NAV = [
+    ("dashboard", "Staff Dashboard", "home"),
+    ("chat", "Staff AI Assistant", "bot"),
+    ("inquiries", "Student Inquiries", "message"),
+    ("knowledge", "Knowledge Base", "book"),
+    ("review", "Question Review", "file-text"),
+    ("documents", "Document Management", "upload"),
+    ("announcements", "School Announcements", "megaphone"),
+    ("analytics", "Analytics & Reports", "chart"),
+    ("settings", "Settings", "settings"),
+]
 
 SAMPLE_PROMPTS = [
     ("Enrollment requirements", "What do I need to enroll as a freshman?"),
@@ -174,6 +184,8 @@ def init_state() -> None:
         st.session_state.view = "chat"
     if "conversation_id" not in st.session_state:
         st.session_state.conversation_id = None
+    if "staff_section" not in st.session_state:
+        st.session_state["staff_section"] = "dashboard"
 
     # Load saved behaviour prefs the first time this session starts
     if "prefs_loaded" not in st.session_state:
@@ -187,6 +199,12 @@ def init_state() -> None:
     requested = st.query_params.get("view")
     if requested in ALL_VIEWS:
         st.session_state.view = requested
+    requested_section = st.query_params.get("section")
+    valid_sections = {key for key, _, _ in STAFF_NAV if key not in {"chat", "settings"}}
+    if st.session_state["staff_section"] not in valid_sections:
+        st.session_state["staff_section"] = "dashboard"
+    if requested_section in valid_sections:
+        st.session_state["staff_section"] = requested_section
 
 
 def current_policy() -> dialogue.Policy:
@@ -225,11 +243,10 @@ def render_sidebar() -> None:
     user_role = auth.get_current_user_role()
     with st.sidebar:
         C.brand()
-        # GRA AI sits in the sidebar under the wordmark, where it is visible on
-        # every view rather than only on the login page.
-        mascot_html = C.mascot("GRA AI", ROOT / "assets" / "gra-ai.png")
-        if mascot_html:
-            st.html(mascot_html)
+        if not auth.is_staff():
+            mascot_html = C.mascot("GRA AI", ROOT / "assets" / "gra-ai.png")
+            if mascot_html:
+                st.html(mascot_html)
 
         # Auth section
         if logged_in:
@@ -259,6 +276,41 @@ def render_sidebar() -> None:
             st.caption("Please log in or create an account to access GRA SCHOOL.")
             return
 
+        if auth.is_staff():
+            C.nav_label("Staff Workspace")
+            waiting_count = len(conversation.get_waiting_conversations())
+            unanswered_count = sum(
+                1 for row in logger.read_logs()
+                if row.get("event") != "feedback" and not row.get("answered")
+            )
+            for key, label, icon_name in STAFF_NAV:
+                badge_count = waiting_count if key == "inquiries" else unanswered_count if key == "review" else 0
+                active = (
+                    st.session_state.view == "settings" if key == "settings"
+                    else st.session_state.view == "chat" if key == "chat"
+                    else st.session_state.view == "dashboard"
+                    and st.session_state.get("staff_section", "dashboard") == key
+                )
+                if C.nav_button(label, icon_name, active, key=f"staff_nav_{key}", badge=badge_count):
+                    if key == "chat":
+                        st.session_state.view = "chat"
+                        st.query_params["view"] = "chat"
+                    elif key == "settings":
+                        st.session_state.view = "settings"
+                        st.query_params["view"] = "settings"
+                    else:
+                        st.session_state["staff_section"] = key
+                        st.session_state.view = "dashboard"
+                        st.query_params["view"] = "dashboard"
+                        st.query_params["section"] = key
+                    st.rerun()
+
+            mascot_html = C.mascot("GRA AI", ROOT / "assets" / "gra-ai.png")
+            if mascot_html:
+                st.html(mascot_html)
+            st.caption("Staff-only workspace · student tools remain separate")
+            return
+
         st.divider()
 
         # Navigation - dashboard only visible to staff
@@ -274,6 +326,87 @@ def render_sidebar() -> None:
                 st.session_state.view = key
                 st.query_params["view"] = key
                 st.rerun()
+
+        if auth.is_student():
+            recent_conversations = conversation.get_student_conversations(user_id or "")
+            with st.expander(f"Recent conversations ({len(recent_conversations)})"):
+                if not recent_conversations:
+                    st.caption("Your conversations will appear here.")
+                for item in recent_conversations[:10]:
+                    session_id = str(item.get("session_id", ""))
+                    status = (
+                        "Resolved" if item.get("status") == "closed"
+                        else str(item.get("status", "active")).capitalize()
+                    )
+                    messages = item.get("messages") or []
+                    last_text = str(
+                        messages[-1].get("text", "New conversation")
+                        if messages else "New conversation"
+                    ).replace("\n", " ").strip()
+                    if len(last_text) > 38:
+                        last_text = f"{last_text[:35]}..."
+                    updated = str(item.get("updated_at", ""))[:16].replace("T", " ")
+                    current = session_id == st.session_state.get("conversation_id")
+                    open_col, delete_col = st.columns([5, 1], gap="small")
+                    with open_col:
+                        if st.button(
+                            f"{'● ' if current else ''}{status} · {last_text}",
+                            key=f"student_recent_nav_{session_id}",
+                            width="stretch",
+                            type="primary" if current else "secondary",
+                            help=f"Open conversation from {updated}",
+                        ):
+                            if _open_student_conversation(user_id or "", session_id):
+                                st.rerun()
+                    with delete_col:
+                        if st.button(
+                            "🗑",
+                            key=f"student_recent_delete_{session_id}",
+                            help="Delete this conversation permanently",
+                        ):
+                            st.session_state[f"confirm_student_delete_{session_id}"] = True
+                            st.rerun()
+
+                    if st.session_state.get(f"confirm_student_delete_{session_id}", False):
+                        st.warning(
+                            f"Delete this {status.lower()} conversation permanently? "
+                            "Its messages and inquiry records will be removed."
+                        )
+                        confirm_col, cancel_col = st.columns(2, gap="small")
+                        with confirm_col:
+                            if st.button(
+                                "Delete permanently",
+                                key=f"confirm_student_delete_yes_{session_id}",
+                                type="primary",
+                                icon=":material/delete_forever:",
+                                width="stretch",
+                            ):
+                                try:
+                                    deleted = conversation.delete_own_conversation(session_id)
+                                except (OSError, PermissionError, ValueError) as error:
+                                    st.error(f"Could not delete the conversation: {error}")
+                                else:
+                                    if deleted:
+                                        st.session_state.pop(
+                                            f"confirm_student_delete_{session_id}", None
+                                        )
+                                        if current:
+                                            st.session_state.conversation_id = None
+                                            st.session_state.messages = []
+                                            st.session_state.session = dialogue.new_session()
+                                        st.rerun()
+                                    else:
+                                        st.error("This conversation is no longer available.")
+                        with cancel_col:
+                            if st.button(
+                                "Cancel",
+                                key=f"confirm_student_delete_no_{session_id}",
+                                width="stretch",
+                            ):
+                                st.session_state.pop(
+                                    f"confirm_student_delete_{session_id}", None
+                                )
+                                st.rerun()
 
         # Staff dashboard - only show if logged in as staff
         if auth.is_staff():
@@ -373,7 +506,7 @@ def _render_answer_meta(index: int, message: dict) -> None:
         if meta.get("options"):
             st.write("**Options offered:** " + ", ".join(meta["options"]))
 
-    up, down, _ = st.columns([1, 1, 3])
+    up, down, refresh, _ = st.columns([1, 1, 1, 2])
     if up.button("Helpful", key=f"up_{index}"):
         if message.get("feedback") != "up":
             message["feedback"] = "up"
@@ -384,8 +517,94 @@ def _render_answer_meta(index: int, message: dict) -> None:
             message["feedback"] = "down"
             dialogue.log_feedback(st.session_state.session, message["text"], "down")
             st.rerun()
+    if refresh.button("Refresh", key=f"refresh_conversation_{index}", icon=":material/refresh:"):
+        conversation_id = st.session_state.get("conversation_id")
+        if not auth.is_student() or not conversation_id:
+            st.error("Sign in to the student account to refresh this conversation.")
+        else:
+            latest_conversation = conversation.get_conversation(conversation_id)
+            if (
+                latest_conversation is None
+                or latest_conversation.get("student_id") != auth.get_current_user_id()
+            ):
+                st.error("This conversation is unavailable to the current account.")
+            else:
+                st.session_state.messages = latest_conversation.get("messages", [])
+                st.rerun()
     if message.get("feedback"):
         st.caption("Thanks - your feedback is logged for the registrar staff.")
+
+
+def _start_new_student_chat(student_id: str, student_name: str | None) -> None:
+    """Start a fresh student conversation without changing resolved history."""
+    new_session = dialogue.new_session()
+    try:
+        new_conversation = conversation.create_conversation(
+            student_id,
+            student_name,
+            session_id=new_session.session_id,
+        )
+    except OSError as error:
+        st.error(f"Could not start a new conversation: {error}")
+        return
+    except ValueError as error:
+        st.error(f"Could not start a new conversation: {error}")
+        return
+
+    st.session_state.conversation_id = new_conversation["session_id"]
+    st.session_state.session = new_session
+    st.session_state.messages = new_conversation.get("messages", [])
+    st.session_state.pop("pending", None)
+    st.rerun()
+
+
+def _open_student_conversation(student_id: str, conversation_id: str) -> bool:
+    """Open a conversation only when it belongs to the authenticated student."""
+    if not auth.is_student() or auth.get_current_user_id() != student_id:
+        st.error("Sign in to the student account that owns this conversation.")
+        return False
+    selected = next(
+        (
+            item for item in conversation.get_student_conversations(student_id)
+            if item.get("session_id") == conversation_id
+        ),
+        None,
+    )
+    if selected is None:
+        st.error("That conversation is unavailable.")
+        return False
+    st.session_state.conversation_id = selected["session_id"]
+    st.session_state.session = dialogue.new_session()
+    st.session_state.session.session_id = selected["session_id"]
+    st.session_state.messages = selected.get("messages", [])
+    st.session_state.pop("pending", None)
+    return True
+
+
+def _request_staff_response(conversation_id: str) -> None:
+    """Move the student's unanswered question to the staff queue."""
+    try:
+        updated = conversation.update_conversation_status(conversation_id, "waiting")
+        if updated is None:
+            st.error("This conversation is no longer available.")
+            return
+        notice = conversation.add_message(
+            conversation_id,
+            "assistant",
+            "Your request has been sent to the staff queue. A staff member can reply here.",
+            meta={
+                "intent": "staff_requested",
+                "source": "student-requested staff support",
+            },
+        )
+    except (OSError, PermissionError, ValueError) as error:
+        st.error(f"Could not request a staff response: {error}")
+        return
+    if notice is None:
+        st.error("The request was queued, but its confirmation could not be saved.")
+        return
+    st.session_state.messages = updated.get("messages", []) + [notice]
+    st.rerun()
 
 
 def render_chat() -> None:
@@ -396,50 +615,97 @@ def render_chat() -> None:
         f"documents. Answers come from the {school} rule base and knowledge base, "
         "with a confidence score and the source shown.",
     )
+    active_announcements = [
+        row for row in staff_content.load_announcements()
+        if row.get("status") in {"published", "scheduled"}
+        and row.get("publish_on", "") <= datetime.now().date().isoformat()
+    ]
+    if active_announcements:
+        with st.expander(f"School announcements ({len(active_announcements)})", expanded=True):
+            for announcement in active_announcements:
+                st.markdown(f"**{announcement.get('title', 'School update')}**")
+                st.write(announcement.get("body", ""))
+                if announcement.get("publish_on"):
+                    st.caption(f"Published {announcement['publish_on']}")
 
-    session: dialogue.Session = st.session_state.session
     logged_in = auth.is_logged_in()
     student_id = auth.get_current_user_id() if logged_in else None
     student_name = auth.get_current_user_name() if logged_in else None
+    chat_principal = (
+        auth.get_current_user_role() if logged_in else None,
+        student_id,
+    )
+    if st.session_state.get("chat_principal") != chat_principal:
+        st.session_state["chat_principal"] = chat_principal
+        st.session_state.conversation_id = None
+        st.session_state.messages = []
+        st.session_state.session = dialogue.new_session()
+    session: dialogue.Session = st.session_state.session
 
     # Get or create conversation for this student
-    if logged_in and student_id:
+    if logged_in and auth.is_student() and student_id:
         if not st.session_state.conversation_id:
             conv = conversation.get_student_conversation(student_id)
             if conv:
                 st.session_state.conversation_id = conv["session_id"]
             else:
-                conv = conversation.create_conversation(student_id, student_name)
+                conv = conversation.create_conversation(
+                    student_id,
+                    student_name,
+                    session_id=session.session_id,
+                )
                 st.session_state.conversation_id = conv["session_id"]
         
         # Load messages from conversation
         conv = conversation.get_conversation(st.session_state.conversation_id)
-        if conv:
+        if conv and conv.get("student_id") == student_id:
             st.session_state.messages = conv["messages"]
+            session.session_id = conv["session_id"]
         else:
-            # Conversation was deleted (closed by staff) - start fresh
             st.session_state.conversation_id = None
             st.session_state.messages = []
             st.rerun()
+    elif not auth.is_student():
+        st.session_state.conversation_id = None
 
     # Show connection status
-    if logged_in and st.session_state.conversation_id:
-        conv = conversation.get_conversation(st.session_state.conversation_id)
-        if conv:
-            status = conv.get("status", "active")
+    current_conversation = None
+    if logged_in and auth.is_student() and st.session_state.conversation_id:
+        current_conversation = conversation.get_conversation(st.session_state.conversation_id)
+        if current_conversation and current_conversation.get("student_id") == student_id:
+            status = current_conversation.get("status", "active")
             if status == "waiting":
-                st.info("🕐 **Waiting for staff response...** A staff member has been notified and will reply shortly.")
-            elif status == "active" and conv.get("assigned_staff"):
+                st.info("🕐 **Waiting for staff response...** Your message is in the staff queue.")
+            elif (
+                status == "active"
+                and current_conversation.get("assigned_staff")
+                and staff_presence.is_staff_online(current_conversation["assigned_staff"])
+            ):
                 st.success("🟢 **Connected with staff** - You can chat with a registrar staff member now.")
+            elif status == "active" and current_conversation.get("assigned_staff"):
+                st.info(
+                    "📨 **Staff assigned** - They are currently offline. "
+                    "Your messages will stay in the staff queue."
+                )
             elif status == "active":
                 st.info("💬 **AI Assistant active** - Type your question below or ask for a staff member.")
             elif status == "closed":
-                st.warning("🔴 **Conversation closed** - Start a new conversation by sending a message.")
+                st.success("✅ **Conversation resolved** - Start a new chat whenever you're ready.")
+                if student_id and st.button(
+                    "Start over",
+                    key="start_new_chat_after_resolution",
+                    type="primary",
+                    icon=":material/add_comment:",
+                ):
+                    _start_new_student_chat(student_id, student_name)
         else:
             # Conversation was deleted - show fresh start message
             st.info("💬 **New conversation started** - How can I help you today?")
 
-    if not st.session_state.messages:
+    conversation_resolved = bool(
+        current_conversation and current_conversation.get("status") == "closed"
+    )
+    if not st.session_state.messages and not conversation_resolved:
         st.markdown("##### Suggested questions")
         cols = st.columns(2)
         for i, (label, prompt) in enumerate(SAMPLE_PROMPTS):
@@ -451,7 +717,7 @@ def render_chat() -> None:
     # Render all messages from conversation
     for index, message in enumerate(st.session_state.messages):
         role = message.get("role", "assistant")
-        if role == "user":
+        if role in {"user", "student"}:
             with st.chat_message("user"):
                 C.user_bubble(message["text"], message.get("timestamp", "")[:5] if message.get("timestamp") else "")
                 if message.get("audio"):
@@ -466,175 +732,235 @@ def render_chat() -> None:
                 C.bot_bubble(message["text"])
                 if message.get("meta") and message["meta"].get("intent") != "voice_recording":
                     _render_answer_meta(index, message)
-
-    # Microphone / Voice recorder tool directly above chat input
-    voice_col1, voice_col2 = st.columns([1, 4])
-    with voice_col1:
-        with st.popover("🎙️ Voice / Mic", help="Record audio using your microphone"):
-            st.markdown("##### 🎙️ Voice Recorder")
-            st.caption("Record your question or voice message. The audio will be played back in the chat.")
-            voice_clip = st.audio_input("Record voice question", key="chat_voice_mic", label_visibility="collapsed")
-            if voice_clip is not None:
-                st.audio(voice_clip, format="audio/wav")
-                if st.button("Send Voice to Chat 🚀", key="chat_send_voice_btn", type="primary", width="stretch"):
-                    audio_raw = voice_clip.getvalue()
-                    ts = datetime.now().strftime("%H:%M")
-                    # Add to local state
-                    st.session_state.messages.append(
-                        {
-                            "role": "user",
-                            "text": "🎙️ [Voice Question Recorded]",
-                            "audio": audio_raw,
-                            "timestamp": datetime.now().isoformat(timespec="seconds"),
-                        }
+                response_meta = message.get("meta", {})
+                can_request_staff = bool(
+                    current_conversation
+                    and current_conversation.get("status") == "active"
+                    and not current_conversation.get("assigned_staff")
+                    and (
+                        response_meta.get("answered") is False
+                        or response_meta.get("escalated")
                     )
-                    # Add to conversation
-                    if st.session_state.conversation_id:
-                        conversation.add_message(
-                            st.session_state.conversation_id,
-                            "student",
-                            "🎙️ [Voice Question Recorded]",
-                            sender_id=student_id,
-                            sender_name=student_name,
-                        )
-                    st.session_state.messages.append(
-                        {
-                            "role": "assistant",
-                            "text": (
-                                "🎙️ **Voice recording received and played back!** You can replay your audio above.\n\n"
-                                "💡 *Tip: Our cognitive handbook rules provide instant verified answers for typed queries. "
-                                "Type your question in the text box below to view your confidence score, official requirements, and eligibility rules.*"
-                            ),
-                            "timestamp": datetime.now().isoformat(timespec="seconds"),
-                            "meta": {
-                                "intent": "voice_recording",
-                                "confidence": 1.0,
-                                "source": "microphone - browser audio",
-                                "rules_fired": [],
-                                "facts": {},
-                            },
-                            "feedback": None,
-                        }
+                )
+                if can_request_staff and auth.is_student():
+                    st.caption(
+                        "If GRA AI could not answer your question, you can ask a staff member to review it."
                     )
-                    if st.session_state.conversation_id:
-                        conversation.add_message(
-                            st.session_state.conversation_id,
-                            "assistant",
-                            "🎙️ Voice recording received and played back!",
+                    if st.button(
+                        "Ask staff to answer",
+                        key=f"request_staff_{current_conversation['session_id']}_{index}",
+                        icon=":material/support_agent:",
+                        type="primary",
+                    ):
+                        _request_staff_response(current_conversation["session_id"])
+
+    if conversation_resolved:
+        st.caption("This resolved conversation is read-only. Start a new chat to send another message.")
+    else:
+        # Microphone / Voice recorder tool directly above chat input
+        voice_col1, voice_col2 = st.columns([1, 4])
+        with voice_col1:
+            with st.popover("🎙️ Voice / Mic", help="Record audio using your microphone"):
+                st.markdown("##### 🎙️ Voice Recorder")
+                st.caption("Record your question or voice message. The audio will be played back in the chat.")
+                voice_clip = st.audio_input("Record voice question", key="chat_voice_mic", label_visibility="collapsed")
+                if voice_clip is not None:
+                    st.audio(voice_clip, format="audio/wav")
+                    if st.button("Send Voice to Chat 🚀", key="chat_send_voice_btn", type="primary", width="stretch"):
+                        audio_raw = voice_clip.getvalue()
+                        st.session_state.messages.append(
+                            {
+                                "role": "user",
+                                "text": "🎙️ [Voice Question Recorded]",
+                                "audio": audio_raw,
+                                "timestamp": datetime.now().isoformat(timespec="seconds"),
+                            }
                         )
-                    st.rerun()
+                        if st.session_state.conversation_id:
+                            conversation.add_message(
+                                st.session_state.conversation_id,
+                                "student",
+                                "🎙️ [Voice Question Recorded]",
+                                sender_id=student_id,
+                                sender_name=student_name,
+                            )
+                        st.session_state.messages.append(
+                            {
+                                "role": "assistant",
+                                "text": (
+                                    "🎙️ **Voice recording received and played back!** You can replay your audio above.\n\n"
+                                    "💡 *Tip: Our cognitive handbook rules provide instant verified answers for typed queries. "
+                                    "Type your question in the text box below to view your confidence score, official requirements, and eligibility rules.*"
+                                ),
+                                "timestamp": datetime.now().isoformat(timespec="seconds"),
+                                "meta": {
+                                    "intent": "voice_recording",
+                                    "confidence": 1.0,
+                                    "source": "microphone - browser audio",
+                                    "rules_fired": [],
+                                    "facts": {},
+                                },
+                                "feedback": None,
+                            }
+                        )
+                        if st.session_state.conversation_id:
+                            conversation.add_message(
+                                st.session_state.conversation_id,
+                                "assistant",
+                                "🎙️ Voice recording received and played back!",
+                            )
+                        st.rerun()
 
-    with voice_col2:
-        st.caption("💡 *Click 🎙️ **Voice / Mic** to record your voice or type your question below.*")
+        with voice_col2:
+            st.caption("💡 *Click 🎙️ **Voice / Mic** to record your voice or type your question below.*")
 
-    prompt = st.session_state.pop("pending", None)
-    typed = st.chat_input("Type your message here...")
-    if typed:
-        prompt = typed
+        prompt = st.session_state.pop("pending", None)
+        typed = st.chat_input("Type your message here...")
+        if typed:
+            prompt = typed
 
-    if prompt:
+    if not conversation_resolved and prompt:
         ts = datetime.now().isoformat(timespec="seconds")
-        # Add to local state
+        if st.session_state.conversation_id:
+            try:
+                student_message = conversation.add_message(
+                    st.session_state.conversation_id,
+                    "student",
+                    prompt,
+                    sender_id=student_id,
+                    sender_name=student_name,
+                )
+            except (OSError, PermissionError, ValueError) as error:
+                st.error(f"Could not send your message: {error}")
+                return
+            if student_message is None:
+                st.error("This conversation is no longer available. Open a recent chat or start over.")
+                return
+            message_timestamp = student_message["timestamp"]
+        else:
+            message_timestamp = ts
         st.session_state.messages.append(
-            {"role": "user", "text": prompt, "timestamp": ts}
+            {"role": "user", "text": prompt, "timestamp": message_timestamp}
         )
-        # Add to conversation
-        if st.session_state.conversation_id:
-            conversation.add_message(
-                st.session_state.conversation_id,
-                "student",
-                prompt,
-                sender_id=student_id,
-                sender_name=student_name,
+
+        assigned_staff = (
+            current_conversation.get("assigned_staff")
+            if current_conversation else None
+        )
+        waiting_for_staff = bool(
+            current_conversation
+            and current_conversation.get("status") == "waiting"
+        )
+        route_to_staff = bool(assigned_staff or waiting_for_staff)
+        staff_online = bool(
+            assigned_staff and staff_presence.is_staff_online(assigned_staff)
+        )
+
+        if route_to_staff and st.session_state.conversation_id:
+            if not staff_online and current_conversation.get("status") != "waiting":
+                try:
+                    conversation.update_conversation_status(
+                        st.session_state.conversation_id, "waiting"
+                    )
+                except (OSError, PermissionError, ValueError) as error:
+                    st.error(f"Your message was saved, but staff routing failed: {error}")
+                    return
+
+            notice = (
+                "📩 Your message was sent to the assigned staff member, who is online."
+                if staff_online
+                else (
+                    "📩 Your message is saved in the assigned staff member's queue. They are currently offline."
+                    if assigned_staff
+                    else "📩 Your message is saved in the staff queue for review."
+                )
             )
-        
-        # Check if conversation has assigned staff who is online
-        staff_online = False
-        assigned_staff = None
-        if st.session_state.conversation_id:
-            conv = conversation.get_conversation(st.session_state.conversation_id)
-            if conv:
-                assigned_staff = conv.get("assigned_staff")
-                if assigned_staff:
-                    staff_online = staff_presence.is_staff_online(assigned_staff)
-        
-        # Route message: if staff is online and assigned, notify them (don't send AI reply)
-        # Otherwise, get AI reply
-        if staff_online and assigned_staff and st.session_state.conversation_id:
-            # Update conversation status to active if it was waiting
-            conv = conversation.get_conversation(st.session_state.conversation_id)
-            if conv and conv.get("status") == "waiting":
-                conversation.update_conversation_status(st.session_state.conversation_id, "active", assigned_staff)
-            
-            # Show notification that staff will respond
-            st.session_state.messages.append(
-                {
-                    "role": "assistant",
-                    "text": f"📩 **Your message has been sent to the assigned staff member.** They are currently online and will respond shortly.",
-                    "timestamp": datetime.now().isoformat(timespec="seconds"),
-                    "meta": {
-                        "intent": "staff_notified",
-                        "confidence": 1.0,
-                        "source": "conversation - staff routing",
-                    },
-                    "feedback": None,
-                }
-            )
-            if st.session_state.conversation_id:
-                conversation.add_message(
+            try:
+                stored_notice = conversation.add_message(
                     st.session_state.conversation_id,
                     "assistant",
-                    f"📩 Your message has been sent to the assigned staff member. They are currently online and will respond shortly.",
+                    notice,
                     meta={
                         "intent": "staff_notified",
                         "source": "conversation - staff routing",
-                    }
+                    },
                 )
+            except (OSError, PermissionError, ValueError) as error:
+                st.error(f"Your message was saved, but the staff notice failed: {error}")
+                return
+            if stored_notice is None:
+                st.error("Your message was saved, but the conversation is unavailable.")
+                return
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "text": notice,
+                    "timestamp": stored_notice["timestamp"],
+                    "meta": stored_notice["meta"],
+                    "feedback": None,
+                }
+            )
         else:
-            # No staff online or no assigned staff - get AI reply
-            reply = dialogue.handle(prompt, session, policy=current_policy(), student_id=student_id, student_name=student_name)
-            
-            # Add AI reply to local state
+            try:
+                reply = dialogue.handle(
+                    prompt,
+                    session,
+                    policy=current_policy(),
+                    student_id=student_id if auth.is_student() else None,
+                    student_name=student_name if auth.is_student() else None,
+                )
+            except (OSError, ValueError, RuntimeError) as error:
+                st.error(f"The assistant could not answer right now: {error}")
+                return
+
+            reply_timestamp = datetime.now().isoformat(timespec="seconds")
+            reply_meta = {
+                "intent": reply.intent,
+                "confidence": reply.confidence,
+                "source": reply.source,
+                "rules_fired": reply.rules_fired,
+                "facts": reply.facts,
+                "blockers": reply.blockers,
+                "clarified": reply.clarified,
+                "escalated": reply.escalated,
+                "sentiment": reply.sentiment,
+                "answered": reply.answered,
+                "options": reply.options,
+                "decisive": reply.decisive,
+                "margin": reply.margin,
+            }
+            if st.session_state.conversation_id:
+                try:
+                    stored_reply = conversation.add_message(
+                        st.session_state.conversation_id,
+                        "assistant",
+                        reply.text,
+                        meta={
+                            "intent": reply.intent,
+                            "confidence": reply.confidence,
+                            "source": reply.source,
+                            "escalated": reply.escalated,
+                            "answered": reply.answered,
+                        },
+                    )
+                except (OSError, PermissionError, ValueError) as error:
+                    st.error(f"The answer was generated but could not be saved: {error}")
+                    return
+                if stored_reply is None:
+                    st.error("The answer was generated but the conversation is unavailable.")
+                    return
+                reply_timestamp = stored_reply["timestamp"]
+
             st.session_state.messages.append(
                 {
                     "role": "assistant",
                     "text": reply.text,
-                    "timestamp": datetime.now().isoformat(timespec="seconds"),
-                    "meta": {
-                        "intent": reply.intent,
-                        "confidence": reply.confidence,
-                        "source": reply.source,
-                        "rules_fired": reply.rules_fired,
-                        "facts": reply.facts,
-                        "blockers": reply.blockers,
-                        "clarified": reply.clarified,
-                        "escalated": reply.escalated,
-                        "sentiment": reply.sentiment,
-                        "options": reply.options,
-                        "decisive": reply.decisive,
-                        "margin": reply.margin,
-                    },
+                    "timestamp": reply_timestamp,
+                    "meta": reply_meta,
                     "feedback": None,
                 }
             )
-            # Add AI reply to conversation
-            if st.session_state.conversation_id:
-                conversation.add_message(
-                    st.session_state.conversation_id,
-                    "assistant",
-                    reply.text,
-                    meta={
-                        "intent": reply.intent,
-                        "confidence": reply.confidence,
-                        "source": reply.source,
-                        "escalated": reply.escalated,
-                    }
-                )
-            
-            # If escalated, update conversation status to waiting
-            if reply.escalated and st.session_state.conversation_id:
-                conversation.update_conversation_status(st.session_state.conversation_id, "waiting")
-        
+
         st.rerun()
 
 
@@ -770,42 +1096,14 @@ def topic_chart(intents: dict):
 
 
 def render_dashboard() -> None:
-    C.hero(
-        "Dashboard",
-        "What students asked, what the assistant could not answer, and what the "
-        "registrar's office should do about it. Use the Live Chat tab to respond to students in real-time.",
-    )
-
-    # Tabs for different dashboard views
-    tab_analytics, tab_live_chat = st.tabs(["📊 Analytics", "💬 Live Chat"])
-
-    with tab_analytics:
-        head_left, head_right = st.columns([3, 1])
-        with head_right:
-            auto = st.toggle("Live update", value=True, key="live_update")
-            interval = st.select_slider(
-                "Refresh every",
-                options=[2, 5, 10, 30, 60],
-                value=5,
-                key="live_interval",
-                format_func=lambda s: f"{s}s",
-                disabled=not auto,
-            )
-
-        # run_every re-runs only this fragment, so the dashboard keeps up with a
-        # student chatting in another tab without reloading the whole page (which
-        # would throw away the filter and search state).
-        if auto:
-            st.fragment(_dashboard_body, run_every=interval)()
-        else:
-            _dashboard_body()
-
-    with tab_live_chat:
-        _render_staff_chat()
+    section = str(st.session_state.get("staff_section", "dashboard"))
+    staff_workspace.render(section, _log_audit, _render_staff_chat)
 
 
 def _render_staff_chat() -> None:
     """Real-time chat interface for staff to communicate with students."""
+    heading = st.session_state.pop("staff_chat_heading", "Student Inquiries")
+    st.markdown(f"## {html.escape(str(heading))}")
     staff_id = auth.get_current_user_id()
     staff_name = auth.get_current_user_name() or staff_id
 
@@ -832,7 +1130,7 @@ def _render_staff_chat() -> None:
     with c2:
         C.kpi("Active Chats", len(active))
     with c3:
-        C.kpi("Closed", len(closed))
+        C.kpi("Resolved", len(closed))
     with c4:
         C.kpi("Staff Online", len(online_staff), "🟢" if online_staff else "🔴")
 
@@ -854,7 +1152,11 @@ def _render_staff_chat() -> None:
     conv_options = []
     for conv in all_convs:
         summary = conversation.get_conversation_summary(conv)
-        status_icon = "🔴" if summary["status"] == "waiting" else ("🟢" if summary["status"] == "active" else "⚫")
+        status_icon = (
+            "🔴" if summary["status"] == "waiting"
+            else "🟢" if summary["status"] == "active"
+            else "✅"
+        )
         staff_icon = "🟢" if summary.get("staff_online") else ("🔴" if summary.get("assigned_staff") else "⚪")
         label = f"{status_icon}{staff_icon} {summary['student_name']} ({summary['student_id']}) - {summary['last_message'][:40]}... ({summary['message_count']} msgs)"
         conv_options.append((summary["session_id"], label))
@@ -885,7 +1187,8 @@ def _render_staff_chat() -> None:
     col1, col2, col3 = st.columns([3, 1, 1])
     with col1:
         st.markdown(f"**{summary['student_name']}** (`{summary['student_id']}`) — {summary['message_count']} messages")
-        status_parts = [f"Status: {summary['status'].capitalize()}"]
+        display_status = "Resolved" if summary["status"] == "closed" else summary["status"].capitalize()
+        status_parts = [f"Status: {display_status}"]
         if assigned_staff:
             status_parts.append(f"Assigned: {summary.get('assigned_staff', 'unknown')}")
             status_parts.append(f"Staff: {'🟢 Online' if staff_online else '🔴 Offline'}")
@@ -893,51 +1196,118 @@ def _render_staff_chat() -> None:
         status_parts.append(f"Last: {summary['updated_at'][:19].replace('T', ' ')}")
         st.caption(" • ".join(status_parts))
     
-    with col2:
-        # Status change (active/waiting) - closed is now a separate action
-        status_options = ["active", "waiting"]
-        if summary["status"] not in status_options:
-            # If somehow closed, default to active
-            summary["status"] = "active"
-        new_status = st.selectbox(
-            "Status",
-            status_options,
-            index=status_options.index(summary["status"]),
-            key=f"status_{selected_session_id}"
-        )
-        if new_status != summary["status"]:
-            conversation.update_conversation_status(selected_session_id, new_status, staff_id)
-            st.rerun()
+    if summary["status"] == "closed":
+        st.success("✅ Resolved — this conversation remains available in staff history.")
+    else:
+        with col2:
+            status_options = ["active", "waiting"]
+            new_status = st.selectbox(
+                "Status",
+                status_options,
+                index=status_options.index(summary["status"]),
+                key=f"status_{selected_session_id}",
+            )
+            if new_status != summary["status"]:
+                try:
+                    conversation.update_conversation_status(
+                        selected_session_id, new_status, staff_id
+                    )
+                except (OSError, PermissionError, ValueError) as error:
+                    st.error(f"Could not update inquiry status: {error}")
+                else:
+                    _log_audit(f"Changed inquiry status to {new_status}", staff_name)
+                    st.rerun()
 
-    with col3:
-        # Button to take over conversation if not assigned or staff is offline
-        if not assigned_staff or not staff_online:
-            if st.button("📥 Take Over", key=f"takeover_{selected_session_id}", type="primary", width="stretch"):
-                conversation.assign_staff_to_conversation(selected_session_id, staff_id, staff_name)
-                conversation.update_conversation_status(selected_session_id, "active", staff_id)
-                st.success(f"You have taken over this conversation!")
-                st.rerun()
-        
-        # Close & Delete button - requires confirmation
-        if st.session_state.get(f"confirm_close_{selected_session_id}", False):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("✅ Confirm Delete", key=f"confirm_yes_{selected_session_id}", type="primary", width="stretch"):
-                    conversation.update_conversation_status(selected_session_id, "closed", staff_id)
-                    st.success("Conversation closed and deleted.")
-                    st.session_state[f"confirm_close_{selected_session_id}"] = False
-                    st.rerun()
-            with col_b:
-                if st.button("❌ Cancel", key=f"confirm_no_{selected_session_id}", width="stretch"):
-                    st.session_state[f"confirm_close_{selected_session_id}"] = False
-                    st.rerun()
-        else:
-            if st.button("🗑️ Close & Delete", key=f"close_{selected_session_id}", type="secondary", width="stretch"):
+        with col3:
+            if not assigned_staff or not staff_online:
+                if st.button("Take Over", key=f"takeover_{selected_session_id}", type="primary", width="stretch"):
+                    try:
+                        assigned = conversation.assign_staff_to_conversation(
+                            selected_session_id, staff_id, staff_name
+                        )
+                    except (OSError, PermissionError, ValueError) as error:
+                        st.error(f"Could not take over this inquiry: {error}")
+                    else:
+                        if assigned:
+                            _log_audit("Assigned a student inquiry", staff_name)
+                            st.rerun()
+                        else:
+                            st.error("This inquiry is no longer available or has been resolved.")
+
+            if st.session_state.get(f"confirm_close_{selected_session_id}", False):
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    if st.button("Confirm resolve", key=f"confirm_yes_{selected_session_id}", type="primary", width="stretch"):
+                        try:
+                            resolved = conversation.update_conversation_status(
+                                selected_session_id, "closed", staff_id
+                            )
+                        except (OSError, PermissionError, ValueError) as error:
+                            st.error(f"Could not resolve this inquiry: {error}")
+                        else:
+                            if resolved:
+                                _log_audit("Resolved a student inquiry", staff_name)
+                                st.session_state[f"confirm_close_{selected_session_id}"] = False
+                                st.rerun()
+                            else:
+                                st.error("This inquiry is no longer available.")
+                with col_b:
+                    if st.button("Cancel", key=f"confirm_no_{selected_session_id}", width="stretch"):
+                        st.session_state[f"confirm_close_{selected_session_id}"] = False
+                        st.rerun()
+            elif st.button("Resolve inquiry", key=f"close_{selected_session_id}", type="secondary", width="stretch"):
                 st.session_state[f"confirm_close_{selected_session_id}"] = True
                 st.rerun()
-        
-        if st.button("🔄 Refresh", key=f"refresh_{selected_session_id}"):
-            st.rerun()
+
+            if st.button("Refresh", key=f"refresh_{selected_session_id}"):
+                st.rerun()
+
+    if st.session_state.get(f"confirm_delete_{selected_session_id}", False):
+        st.warning(
+            "This permanently deletes the selected conversation and its inquiry-log records. "
+            "The student's account will not be deleted."
+        )
+        delete_col, cancel_col = st.columns(2)
+        with delete_col:
+            if st.button(
+                "Confirm permanent delete",
+                key=f"confirm_delete_yes_{selected_session_id}",
+                type="primary",
+                icon=":material/delete_forever:",
+                width="stretch",
+            ):
+                try:
+                    deleted = conversation.delete_conversation(selected_session_id)
+                except (OSError, PermissionError, ValueError) as error:
+                    st.error(f"Could not delete the conversation: {error}")
+                else:
+                    if deleted:
+                        _log_audit(
+                            f"Permanently deleted student conversation {selected_session_id}",
+                            staff_name,
+                        )
+                        st.session_state.pop(f"confirm_delete_{selected_session_id}", None)
+                        st.session_state.pop("staff_conv_select", None)
+                        st.success("Conversation permanently deleted.")
+                        st.rerun()
+                    else:
+                        st.error("This conversation was already deleted or is no longer available.")
+        with cancel_col:
+            if st.button(
+                "Cancel delete",
+                key=f"confirm_delete_no_{selected_session_id}",
+                width="stretch",
+            ):
+                st.session_state.pop(f"confirm_delete_{selected_session_id}", None)
+                st.rerun()
+    elif st.button(
+        "Delete conversation",
+        key=f"delete_conversation_{selected_session_id}",
+        type="secondary",
+        icon=":material/delete:",
+    ):
+        st.session_state[f"confirm_delete_{selected_session_id}"] = True
+        st.rerun()
 
     st.divider()
 
@@ -978,39 +1348,47 @@ def _render_staff_chat() -> None:
     st.divider()
 
     # Staff reply input
-    st.markdown("##### Reply as Staff")
-    reply_text = st.text_area("Your response", key=f"staff_reply_{selected_session_id}", height=100)
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        if st.button("Send 📨", key=f"send_{selected_session_id}", type="primary", width="stretch"):
-            if reply_text.strip():
-                conversation.add_message(
-                    selected_session_id,
-                    "staff",
-                    reply_text.strip(),
-                    sender_id=staff_id,
-                    sender_name=staff_name,
-                )
-                # Update status to active if it was waiting
-                if summary["status"] == "waiting":
-                    conversation.update_conversation_status(selected_session_id, "active", staff_id)
+    if summary["status"] != "closed":
+        st.markdown("##### Reply as Staff")
+        pending_template = st.session_state.pop(f"staff_reply_template_{selected_session_id}", None)
+        if pending_template:
+            st.session_state[f"staff_reply_{selected_session_id}"] = pending_template
+        reply_text = st.text_area("Your response", key=f"staff_reply_{selected_session_id}", height=100)
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("Send reply", key=f"send_{selected_session_id}", type="primary", width="stretch"):
+                if reply_text.strip():
+                    try:
+                        message = conversation.add_message(
+                            selected_session_id,
+                            "staff",
+                            reply_text.strip(),
+                            sender_id=staff_id,
+                            sender_name=staff_name,
+                        )
+                    except (OSError, PermissionError, ValueError) as error:
+                        st.error(f"Could not send your reply: {error}")
+                    else:
+                        if message is None:
+                            st.error("This inquiry is no longer available.")
+                        else:
+                            _log_audit("Replied to a student inquiry", staff_name)
+                            st.rerun()
+                else:
+                    st.warning("Please enter a message")
+        with col2:
+            quick_replies = [
+                "Hello! I'm a registrar staff member. How can I help you?",
+                "I've checked your records and here's what I found...",
+                "Please visit the Registrar's Office at Main Building Room 101 during office hours.",
+                "Your request has been processed. You'll receive a confirmation email shortly.",
+                "Let me transfer you to the appropriate department.",
+            ]
+            selected_template = st.selectbox("Quick reply", [""] + quick_replies, key=f"quick_{selected_session_id}")
+            if selected_template and st.button("Use Template", key=f"use_template_{selected_session_id}"):
+                st.session_state[f"staff_reply_template_{selected_session_id}"] = selected_template
                 st.rerun()
-            else:
-                st.warning("Please enter a message")
-    with col2:
-        # Quick reply templates
-        quick_replies = [
-            "Hello! I'm a registrar staff member. How can I help you?",
-            "I've checked your records and here's what I found...",
-            "Please visit the Registrar's Office at Main Building Room 101 during office hours.",
-            "Your request has been processed. You'll receive a confirmation email shortly.",
-            "Let me transfer you to the appropriate department.",
-        ]
-        selected_template = st.selectbox("Quick reply", [""] + quick_replies, key=f"quick_{selected_session_id}")
-        if selected_template and st.button("Use Template", key=f"use_template_{selected_session_id}"):
-            st.info(f"Template selected: {selected_template[:50]}... (copy and paste above)")
-
-    st.caption("💡 Tip: Click 🔄 Refresh to check for new messages from the student.")
+        st.caption("Refresh to check for new messages from the student.")
 
 
 def _unanswered_table_html(rows: list[dict]) -> str:
@@ -1151,6 +1529,12 @@ def _dashboard_body() -> None:
         status_filter = filter_col.radio(
             "Status",
             ["All", "active", "waiting", "closed"],
+            format_func=lambda value: {
+                "All": "All",
+                "active": "Active",
+                "waiting": "Waiting",
+                "closed": "Resolved",
+            }[value],
             horizontal=True,
             key="conv_status_filter",
         )
@@ -1197,7 +1581,7 @@ def _dashboard_body() -> None:
                 status_badge = {
                     "active": "<span class='cca-badge cca-badge--good'>🟢 Active</span>",
                     "waiting": "<span class='cca-badge cca-badge--warn'>🟡 Waiting</span>",
-                    "closed": "<span class='cca-badge cca-badge--danger'>🔴 Closed</span>",
+                    "closed": "<span class='cca-badge cca-badge--good'>✅ Resolved</span>",
                 }.get(status, f"<span class='cca-badge cca-badge--info'>{status}</span>")
 
                 # Staff online indicator
@@ -1436,7 +1820,11 @@ def render_register() -> None:
         st.query_params["view"] = "chat"
         st.rerun()
 
-    role = st.radio("Register as", ["Student", "Staff"], horizontal=True, key="register_role")
+    role = "Student"
+    if auth.is_staff():
+        role = st.radio("Register as", ["Student", "Staff"], horizontal=True, key="register_role")
+    else:
+        st.info("Student accounts can be self-registered. Staff accounts must be created by an authorized staff member.")
     role_value = "student" if role == "Student" else "staff"
 
     with st.form("register_form", clear_on_submit=False):
@@ -1522,6 +1910,14 @@ def main() -> None:
         # Staff dashboard - only accessible to logged-in staff
         if auth.is_staff():
             render_dashboard()
+        else:
+            st.error("Staff access required. Please log in as staff.")
+            st.session_state.view = "login"
+            st.query_params["view"] = "login"
+            st.rerun()
+    elif view == "dashboard_chat":
+        if auth.is_staff():
+            _render_staff_chat()
         else:
             st.error("Staff access required. Please log in as staff.")
             st.session_state.view = "login"

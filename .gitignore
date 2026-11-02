@@ -5,6 +5,13 @@
 .env
 .streamlit/secrets.toml
 
+# --- staff-authored content and student-facing files ---------------------
+data/knowledge_articles.json
+data/staff_announcements.json
+data/staff_documents.json
+data/staff_documents/
+data/staff_reports/
+
 # --- editor / agent workspace artifacts ----------------------------------
 # These are Code Janitor's own memory files. They are not imported by any
 # Python module, and their previews print STAFF_PASSCODE in plaintext.

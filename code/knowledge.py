@@ -298,6 +298,33 @@ def search(question: str, limit: int = 3) -> list[dict]:
                 }
             )
 
+    from code import staff_content
+
+    for record in staff_content.load_articles():
+        if record.get("status") != "approved":
+            continue
+        blob = " ".join(
+            str(record.get(key, ""))
+            for key in ("title", "content", "category", "source")
+        ).lower()
+        overlap = sum(1 for word in words if word in blob)
+        if not overlap:
+            continue
+        title = record.get("title", "")
+        phrase_bonus = 3 if title and title.lower() in flat else 0
+        hits.append(
+            {
+                "section": "staff-verified articles",
+                "score": overlap + phrase_bonus,
+                "record": {
+                    "name": title,
+                    "text": record.get("content", ""),
+                    "source": record.get("source", ""),
+                    "status": "VERIFIED",
+                },
+            }
+        )
+
     hits.sort(key=lambda h: h["score"], reverse=True)
     return hits[:limit]
 
@@ -318,7 +345,7 @@ def answer_from_search(question: str) -> KnowledgeAnswer | None:
         record = hit["record"]
         name = record.get("name") or record.get("label") or record.get("code") or hit["section"]
         detail_parts = []
-        for key in ("description", "statement", "text", "location", "hours", "date", "amount"):
+        for key in ("description", "statement", "text", "location", "hours", "date", "amount", "source"):
             if record.get(key):
                 value = record[key]
                 detail_parts.append(

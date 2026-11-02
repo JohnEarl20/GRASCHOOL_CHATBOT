@@ -124,21 +124,29 @@ def login_card_open(title: str, lede: str, icon_name: str = "users") -> None:
     )
 
 
-def nav_button(label: str, icon_name: str, active: bool, key: str) -> bool:
+def nav_button(label: str, icon_name: str, active: bool, key: str, badge: int = 0) -> bool:
     """One sidebar nav entry. Returns True when it was clicked."""
-    # Icons inherit `currentColor` so they follow the same light/dark palette as
-    # the label. A hard-coded hex here painted near-white glyphs on the pale
-    # light-theme sidebar, where they were invisible.
-    colour = "currentColor"
-    st.markdown(
-        f"<div class='cca-nav-row' data-active='{str(active).lower()}'>"
-        f"{icon(icon_name, 17, colour)}"
-        f"<span>{_esc(label)}</span></div>",
-        unsafe_allow_html=True,
+    material_icons = {
+        "home": "dashboard",
+        "bot": "smart_toy",
+        "message": "chat",
+        "book": "menu_book",
+        "file-text": "rate_review",
+        "upload": "upload_file",
+        "megaphone": "campaign",
+        "users": "groups",
+        "chart": "bar_chart",
+        "settings": "settings",
+    }
+    button_label = f"{label}  ·  {badge}" if badge > 0 else label
+    return st.button(
+        button_label,
+        key=key,
+        width="stretch",
+        type="primary" if active else "secondary",
+        icon=f":material/{material_icons.get(icon_name, 'circle')}:",
+        icon_position="left",
     )
-    # The visible row above is decoration; the real control is invisible but
-    # focusable, so keyboard users can still reach it.
-    return st.button(label, key=key, width="stretch")
 
 
 def section_title(title: str, subtitle: str = "") -> None:

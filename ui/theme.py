@@ -446,27 +446,6 @@ a {{ color: var(--accent); }}
 .cca-brand-name, .cca-brand-sub {{ color: var(--fg); }}
 .cca-brand-sub {{ color: var(--fg-muted); }}
 
-/* ---------- nav pill rendered beside the real button ----------
-   app.py draws the real st.button; this pill is the visible affordance and
-   is styled from the same selector Streamlit gives the button row, so the two
-   cannot drift apart in colour or size. */
-.cca-nav-row {{
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px; margin: -2px 0 6px 0;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--input-bg);
-  color: var(--fg);
-  font-size: 0.9rem;
-  font-weight: 500;
-}}
-.cca-nav-row[data-active="true"] {{
-  background: linear-gradient(135deg, var(--primary), var(--primary-2));
-  border-color: transparent;
-  color: #FFFFFF;
-  box-shadow: 0 12px 28px -16px var(--primary-glow);
-}}
-
 /* ---------- nav ---------- */
 .cca-nav-label {{
   font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.12em;
@@ -1326,6 +1305,270 @@ div[data-testid="stHorizontalBlock"] .cca-cat-btn button {{
   }}
   .cca-dev-card:hover {{ transform: none; }}
 }}
+
+/* ---------- staff workspace ---------- */
+.cca-analytics-hero {{
+  margin-bottom: 14px;
+  padding: 18px 22px;
+  border: 1px solid rgba(0,168,255,0.46);
+  border-radius: 17px;
+  background:
+    radial-gradient(ellipse at 92% 18%, rgba(0,168,255,0.16), transparent 36%),
+    linear-gradient(110deg, rgba(3,21,47,0.96), rgba(8,38,83,0.72));
+  box-shadow: inset 0 1px rgba(255,255,255,0.06), 0 10px 28px rgba(0,55,140,0.16);
+}}
+.cca-analytics-hero span {{
+  color: #35D5FF;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}}
+.cca-analytics-hero h1 {{
+  margin: 3px 0 2px;
+  color: #FFFFFF;
+  font-size: clamp(1.45rem, 2.4vw, 2rem);
+}}
+.cca-analytics-hero p {{
+  margin: 0;
+  color: #C0D4F0;
+  font-size: 0.86rem;
+}}
+#analytics-kpi-row .cca-staff-kpi {{
+  min-height: 116px;
+}}
+.cca-print-button {{
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(0,168,255,0.5);
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(8,49,101,0.94), rgba(3,20,47,0.94));
+  color: #FFFFFF;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}}
+.cca-print-button:hover {{
+  border-color: #00DFFF;
+  box-shadow: 0 6px 20px rgba(0,168,255,0.18);
+}}
+@media print {{
+  [data-testid="stSidebar"], [data-testid="stHeader"], .stButton,
+  .stDownloadButton, [data-testid="stToolbar"] {{
+    display: none !important;
+  }}
+  .stApp, [data-testid="stMain"] {{
+    background: #FFFFFF !important;
+    color: #111827 !important;
+  }}
+}}
+.cca-staff-hero {{
+  min-height: 130px;
+  padding: 22px 26px;
+  border: 1px solid rgba(0,168,255,0.55);
+  border-radius: 20px;
+  background:
+    radial-gradient(ellipse at 86% 20%, rgba(0,168,255,0.24), transparent 44%),
+    linear-gradient(110deg, rgba(3,21,47,0.96), rgba(8,38,83,0.78));
+  box-shadow: inset 0 1px rgba(255,255,255,0.08), 0 12px 34px rgba(0,75,180,0.22);
+}}
+.cca-staff-hero-eyebrow {{
+  color: #35D5FF;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}}
+.cca-staff-hero h1 {{
+  margin: 5px 0 4px;
+  color: #FFFFFF;
+  font-size: clamp(1.7rem, 3vw, 2.45rem);
+  letter-spacing: 0.02em;
+}}
+.cca-staff-hero p {{
+  margin: 0;
+  color: #C0D4F0;
+  font-size: 0.92rem;
+}}
+.cca-staff-kpi {{
+  height: 100%;
+  min-height: 120px;
+  box-sizing: border-box;
+  padding: 13px 14px;
+  border: 1px solid rgba(0,168,255,0.48);
+  border-radius: 15px;
+  background: linear-gradient(145deg, rgba(8,38,83,0.94), rgba(3,19,45,0.94));
+  box-shadow: inset 0 1px rgba(255,255,255,0.06), 0 8px 26px rgba(0,40,120,0.18);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}}
+.cca-staff-kpi:hover {{
+  transform: translateY(-2px);
+  border-color: rgba(0,223,255,0.82);
+  box-shadow: 0 10px 28px rgba(0,132,255,0.2);
+}}
+.cca-staff-kpi-icon {{
+  height: 25px;
+  margin-bottom: 5px;
+}}
+.cca-staff-kpi-value {{
+  color: #FFFFFF;
+  font-size: 1.65rem;
+  font-weight: 750;
+  line-height: 1.1;
+}}
+.cca-staff-kpi-label {{
+  margin-top: 4px;
+  color: #FFFFFF;
+  font-size: 0.79rem;
+  font-weight: 650;
+}}
+.cca-staff-kpi-note {{
+  margin-top: 3px;
+  color: #A9BCD8;
+  font-size: 0.68rem;
+  line-height: 1.25;
+}}
+.cca-staff-section-heading {{
+  margin: 18px 0 9px;
+  color: #FFFFFF;
+  font-size: 1.05rem;
+  font-weight: 750;
+}}
+.cca-staff-panel-title {{
+  margin: 0 0 8px;
+  color: #FFFFFF;
+  font-size: 0.95rem;
+  font-weight: 700;
+}}
+.cca-staff-stat-row {{
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(110,157,220,0.18);
+}}
+.cca-staff-stat-icon {{
+  display: flex;
+  flex: 0 0 18px;
+}}
+.cca-staff-stat-name {{
+  flex: 1;
+  color: #FFFFFF;
+  font-size: 0.77rem;
+}}
+.cca-staff-stat-name small {{
+  display: block;
+  margin-top: 2px;
+  color: #A9BCD8;
+  font-size: 0.66rem;
+}}
+.cca-staff-stat-row strong {{
+  color: #FFFFFF;
+  font-size: 0.83rem;
+  text-align: right;
+}}
+.cca-staff-system-value--healthy {{ color: #00E676 !important; }}
+.cca-staff-system-value--unhealthy {{ color: #FF6478 !important; }}
+.cca-staff-system-value--unknown {{ color: #FFC107 !important; }}
+.cca-staff-table-wrap {{
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid rgba(0,168,255,0.38);
+  border-radius: 13px;
+  background: rgba(3,18,43,0.78);
+}}
+.cca-staff-table {{
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  color: #FFFFFF;
+  font-size: 0.76rem;
+}}
+.cca-staff-table th {{
+  padding: 10px 9px;
+  background: rgba(8,45,94,0.9);
+  color: #C0D4F0;
+  text-align: left;
+  white-space: nowrap;
+}}
+.cca-staff-table td {{
+  padding: 9px;
+  border-top: 1px solid rgba(110,157,220,0.16);
+  color: #E8F1FF;
+  vertical-align: top;
+}}
+.cca-staff-question {{ min-width: 220px; max-width: 390px; }}
+.cca-staff-status {{
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(169,188,216,0.16);
+  color: #DCEBFF;
+  white-space: nowrap;
+}}
+.cca-staff-status--resolved {{ background: rgba(0,230,118,0.18); color: #69F0AE; }}
+.cca-staff-status--pending {{ background: rgba(255,193,7,0.18); color: #FFD54F; }}
+.cca-staff-status--unanswered {{ background: rgba(255,59,79,0.2); color: #FF7B88; }}
+.cca-staff-insight {{
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 11px 12px;
+  border: 1px solid rgba(0,168,255,0.3);
+  border-radius: 13px;
+  background: linear-gradient(130deg, rgba(8,38,83,0.76), rgba(3,17,40,0.78));
+}}
+.cca-staff-insight-mark {{ display: flex; padding-top: 2px; }}
+.cca-staff-insight-copy {{ flex: 1; min-width: 0; }}
+.cca-staff-insight-copy strong {{ color: #FFFFFF; font-size: 0.8rem; }}
+.cca-staff-insight-copy p {{
+  margin: 3px 0;
+  color: #C0D4F0;
+  font-size: 0.74rem;
+}}
+.cca-staff-insight-copy small {{ color: #A9BCD8; font-size: 0.68rem; }}
+.cca-staff-insight-meta {{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  color: #FFC107;
+  font-size: 0.65rem;
+  white-space: nowrap;
+}}
+.cca-staff-insight-meta b {{ color: #A9BCD8; font-weight: 500; }}
+.cca-staff-action-icon {{ display: flex; justify-content: center; padding: 10px 0 4px; }}
+.st-key-staff-quick-actions [data-testid="stHorizontalBlock"] > div {{
+  min-width: 0;
+}}
+.st-key-staff-quick-actions button {{
+  min-height: 52px;
+  border: 1px solid rgba(0,168,255,0.55);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(8,49,101,0.94), rgba(3,20,47,0.94));
+  color: #FFFFFF;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}}
+.st-key-staff-quick-actions button:hover {{
+  transform: translateY(-2px);
+  border-color: #00DFFF;
+  box-shadow: 0 8px 24px rgba(0,168,255,0.22);
+}}
+@media (max-width: 1100px) {{
+  .st-key-staff-kpi-row [data-testid="stHorizontalBlock"] {{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }}
+}}
+@media (max-width: 640px) {{
+  .cca-staff-hero {{ padding: 18px; }}
+  .cca-staff-hero p {{ font-size: 0.82rem; }}
+  .st-key-staff-kpi-row [data-testid="stHorizontalBlock"] {{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }}
+  .cca-staff-insight {{ flex-wrap: wrap; }}
+  .cca-staff-insight-meta {{ width: 100%; flex-direction: row; justify-content: space-between; }}
+}}
 """
 
 
@@ -1381,6 +1624,7 @@ def icon(name: str, size: int = 18, colour: str = "currentColor") -> str:
         "activity": '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
         "school": '<path d="m4 6 8-4 8 4"/><path d="m18 10 4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/><path d="M14 22v-4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4"/><path d="M18 5v17"/><path d="M6 5v17"/><circle cx="12" cy="9" r="2"/>',
         "file-text": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>',
+        "book": '<path d="M12 7v14"/><path d="M3 18V5a2 2 0 0 1 2-2h3a4 4 0 0 1 4 4 4 4 0 0 1 4-4h3a2 2 0 0 1 2 2v13"/><path d="M3 18a3 3 0 0 1 3-3h3a3 3 0 0 1 3 3 3 3 0 0 1 3-3h3a3 3 0 0 1 3 3v1a2 2 0 0 1-2 2h-4a3 3 0 0 0-3 2 3 3 0 0 0-3-2H5a2 2 0 0 1-2-2z"/>',
         "save": '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
         "rotate-ccw": '<path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
         "server": '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
