@@ -88,8 +88,13 @@ official school records.
 
 ```bash
 python tests/test_app.py
+python -m unittest discover -s tests -p test_staff_workspace.py -v
+```
 
-> All **81 verification checks** must pass cleanly across the 13 rule cases, ontology schema consistency, Taglish NLU extraction, and conversation state management.
+The application runner checks the 13-rule engine, hand-made cases, ontology
+consistency, Taglish NLU extraction, conversation state management, and
+sentiment-model inference. The workspace suite also covers account/session
+restoration, logout cleanup, staff workflows, and conversation storage.
 
 *(Note: On Windows, use `python`, not `python3.14.exe` if local path restrictions apply. The standard interpreter is `C:\Python314\python.exe`.)*
 
@@ -97,7 +102,16 @@ python tests/test_app.py
 
 ## Authentication & Role-Based Access Control
 
-The application implements a unified authentication system (`code/auth.py`) with salted PBKDF2-SHA256 password hashes and role separation. Existing SHA-256 student credentials remain valid and are verified during login. Account data is stored locally in `data/users.json` and is not included in the repository:
+The application implements a unified authentication system (`code/auth.py`) with salted PBKDF2-SHA256 password hashes and role separation. Existing SHA-256 student credentials remain valid and are verified during login. Account data uses `data/users.json` for local development; when `DATABASE_URL` is configured, student and staff accounts use PostgreSQL instead. Keep account files and database credentials private; do not commit them:
+
+Successful logins are remembered in a signed, browser-specific cookie for up to
+30 days, so refreshing the page or reconnecting from the same browser does not
+send the user back to Login. The app reads the cookie from the initial browser
+request before checking protected-page access, avoiding an asynchronous
+component-read race during refresh. The cookie is bound to the account's
+password hash, so changing the password or removing the account invalidates it.
+Logout expires the cookie on that browser. Each phone, computer, or browser
+needs its own initial sign-in; use Logout on shared devices.
 
 - **🎓 Student Accounts**:
   - Access to the **AI Assistant** conversation interface.
@@ -220,10 +234,10 @@ User Query (English / Filipino / Taglish)
    - Analytics & Reports provides period, date, category, status, and staff filters with inquiry trends, category and status charts, weekday activity, KPI comparisons, searchable inquiry records, and activity-based recommendations.
    - Staff can generate and preview inquiry, AI performance, unanswered, category, staff activity, semester, and operations reports, then download CSV, Excel, or PDF and print the page.
    - Generated report files and the last 100 report-history entries are stored locally under `data/staff_reports/`, excluded from Git, and report creation is audit-logged.
-   - Question review can add staff labels to the existing training corpus.
+   - Question Review refreshes every two seconds with student questions from the chat log and conversation messages, including AI-answered and staff-routed messages; overlapping entries are deduplicated, and staff can label questions and explicitly retrain the intent model.
    - Staff-approved knowledge articles are stored locally and are the only newly authored articles used by the assistant.
    - Staff documents and announcements use local file/JSON storage; published announcements appear in the student assistant.
-   - Verified accuracy and response-time metrics are reported only when corresponding evaluation/timing records exist. No analytics API or relational database is configured; the dashboard uses existing local log and conversation files.
+   - Verified accuracy and response-time metrics are reported only when corresponding evaluation/timing records exist. The dashboard uses local log and conversation files rather than an analytics API; optional PostgreSQL storage is for student/staff accounts only.
 
 5. **Advanced Futuristic Settings Dashboard (`/?view=settings`)**:
    - Re-designed to match the GRA SCHOOL futuristic educational dashboard design reference.
@@ -333,6 +347,6 @@ grado, buong address, o financial bank details habang nakikipag-usap.
 ## Project Status & Verification
 
 - **Current Build**: `v2.0.0`
-- **Unit & Integration Tests**: `python tests/test_app.py` passed (**81 / 81 checks**).
-- **Intent Classifier**: Hold-out accuracy `0.86`, Macro F1 `0.86` across 10 intents.
+- **Unit & Integration Tests**: `python tests/test_app.py` passed (**82 / 82 checks**).
+- **Intent Classifier**: Hold-out accuracy `0.8955`, Macro F1 `0.8965` across 10 intents (same-writer split; the independent 50-question evaluation set is still pending).
 - **Design System**: Fully responsive dark-glass UI with full-page campus wallpaper, live hardware telemetry, and role-tailored dashboard controls.

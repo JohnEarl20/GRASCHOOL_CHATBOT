@@ -392,12 +392,12 @@ Ang bawat sagot ay may:
 
 Sa kaliwa, makikita mo:
 
-1. **Signed in as** — switch ng **Student** / **Staff** (⚠️ demo control lang, hindi login)
-2. **Navigation** — apat na views
+1. **Signed in as** — account name at role. Mag-login gamit ang ID at password; puwedeng mag-register ang estudyante, pero staff account ay ginagawa lang ng awtorisadong admin.
+2. **Navigation** — mga page na pinapayagan para sa role mo; may Logout para tapusin ang session sa browser na ito.
 3. **This session** — natatandaan ba ng bot ang student type at documents mo?
 4. **Start over** — i-reset ang session
 
-Kapag **Student**, nakatago ang Staff Dashboard sa navigation. Kapag **Staff**, lumalabas ito.
+Kapag **Student**, nakatago ang staff-only pages. Kapag **Staff**, lumalabas ang staff workspace at dashboard. Pagkatapos mag-login, naaalala ng parehong browser ang session nang hanggang 30 araw para hindi bumalik sa Login sa simpleng refresh. Kailangang mag-login nang hiwalay sa bawat browser o device. Binubura ng Logout ang session cookie; binabago rin ng password ang lumang session.
 
 ### E. Voice Upload
 
@@ -416,6 +416,7 @@ Pindutin ang **Staff Dashboard** sa sidebar (o `?view=dashboard&role=Staff`). Di
 4. **Recommendation** — kung kailan mag-staff ng mas marami, may ebidensya at confidence
 5. **Unanswered questions** — search box, table, at labeling controls
 6. **Feedback** — helpful vs not helpful
+7. **Question Review** — bagong tanong mula sa chat log at conversation messages ay kusang lumalabas kada 2 segundo, kasama ang nasagot na ng AI at ipinasa sa staff. Tinatanggal ang magkakaparehong entry; puwedeng lagyan ng staff label at manu-manong i-retrain ang intent model.
 
 **⚠️ Ang data dito ay SAMPLE LANG** — synthetic, galing sa `scripts/seed_sample_logs.py`. Sinasabi ito ng dashboard mismo sa dilaw na babala.
 
@@ -565,7 +566,7 @@ Maging tapat tayo. Ito ang mga bagay na hindi pa tapos:
 | **Voice recording** | ✅ Gumagana | Totoong mikropono ng browser + upload ng file |
 | **Speech-to-text** | ⛔ Sinadyang alisin | Walang speech recognition — type lang ang tanong |
 | **LLM rewording** | ❌ Naka-off | Walang provider na konektado |
-| **Login page** | ❌ Sinadya | Walang authentication sa proyekto; ayaw naming gumawa ng pekeng login |
+| **Authentication** | ✅ Gumagana | Role-based login; student self-registration; staff accounts para lang sa authorized admin; signed browser session cookie hanggang 30 araw |
 | **Tunay na datos** | ❌ DRAFT pa | Placeholder lang ang mga numero |
 | **Log masking** | ❌ Wala pa | Hindi pa nafi-filter ang personal data |
 | **Fairness check** | ❌ Wala pa | Kailangan ng 50 unseen questions |
