@@ -5,9 +5,10 @@
 # scikit-learn pipelines. Unpickling across scikit-learn versions can fail or,
 # worse, silently mispredict - so the pin is load-bearing, not tidiness.
 #
-# Verified on: Python 3.14.2, Windows 11, `python tests/test_app.py` = 81 checks.
+# Verified on: Python 3.14.2, Windows 11, `python tests/test_app.py` = 82 checks.
 
 streamlit==1.53.0
+extra-streamlit-components==0.1.81
 scikit-learn==1.8.0
 pandas==2.3.3
 numpy==2.4.1

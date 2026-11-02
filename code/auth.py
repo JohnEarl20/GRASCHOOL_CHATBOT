@@ -6,6 +6,7 @@ supported so legacy accounts can continue to sign in.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import json
@@ -13,6 +14,7 @@ import os
 import re
 import secrets
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -27,6 +29,8 @@ ADMIN_ENV_PATH = ROOT / ".env"
 
 SESSION_KEY = "user_id"
 SESSION_ROLE_KEY = "user_role"
+SESSION_COOKIE_NAME = "gra_auth_session"
+SESSION_COOKIE_TTL_SECONDS = 30 * 24 * 60 * 60
 PASSWORD_SCHEME = "pbkdf2_sha256"
 PASSWORD_ITERATIONS = 600_000
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -485,6 +489,98 @@ def logout() -> None:
     """Log out the current user."""
     for key in (SESSION_KEY, SESSION_ROLE_KEY):
         st.session_state.pop(key, None)
+
+
+def create_session_token() -> str:
+    """Create a signed, expiring token for restoring this browser's login."""
+    user_id = get_current_user_id()
+    if not user_id:
+        raise ValueError("An authenticated account is required to create a session token.")
+
+    account = _load_users().get(user_id)
+    if not account or account.get("role") not in {"student", "staff"}:
+        raise AccountStoreError("The signed-in account is no longer available.")
+    password_hash = account.get("password_hash")
+    if not isinstance(password_hash, str) or not password_hash:
+        raise AccountStoreError("The signed-in account has no valid password record.")
+
+    payload = {
+        "user_id": user_id,
+        "expires_at": int(time.time()) + SESSION_COOKIE_TTL_SECONDS,
+        "nonce": secrets.token_urlsafe(16),
+    }
+    encoded_payload = base64.urlsafe_b64encode(
+        json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    ).rstrip(b"=").decode("ascii")
+    signing_key = hashlib.sha256(
+        f"gra-auth-session-v1:{password_hash}".encode("utf-8")
+    ).digest()
+    signature = hmac.new(
+        signing_key,
+        encoded_payload.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"{encoded_payload}.{signature}"
+
+
+def restore_session_token(token: str) -> bool:
+    """Restore a login only when its signature, expiry, and account still match."""
+    if not isinstance(token, str) or len(token) > 2048:
+        return False
+    encoded_payload, separator, supplied_signature = token.partition(".")
+    if (
+        not separator
+        or not re.fullmatch(r"[A-Za-z0-9_-]+", encoded_payload)
+        or not re.fullmatch(r"[0-9a-f]{64}", supplied_signature)
+    ):
+        return False
+
+    try:
+        padding = "=" * (-len(encoded_payload) % 4)
+        payload = json.loads(
+            base64.urlsafe_b64decode(encoded_payload + padding).decode("utf-8")
+        )
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+
+    user_id = payload.get("user_id")
+    expires_at = payload.get("expires_at")
+    nonce = payload.get("nonce")
+    if (
+        not isinstance(user_id, str)
+        or not user_id
+        or not isinstance(expires_at, int)
+        or isinstance(expires_at, bool)
+        or not isinstance(nonce, str)
+        or not nonce
+        or expires_at <= int(time.time())
+        or expires_at > int(time.time()) + SESSION_COOKIE_TTL_SECONDS + 60
+    ):
+        return False
+
+    stored_id, account = _find_account(_load_users(), user_id)
+    if not stored_id or not account or account.get("role") not in {"student", "staff"}:
+        return False
+    password_hash = account.get("password_hash")
+    if not isinstance(password_hash, str) or not password_hash:
+        return False
+
+    signing_key = hashlib.sha256(
+        f"gra-auth-session-v1:{password_hash}".encode("utf-8")
+    ).digest()
+    expected_signature = hmac.new(
+        signing_key,
+        encoded_payload.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(expected_signature, supplied_signature):
+        return False
+
+    st.session_state[SESSION_KEY] = stored_id
+    st.session_state[SESSION_ROLE_KEY] = account["role"]
+    return True
 
 
 def is_logged_in() -> bool:

@@ -176,6 +176,72 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
             self.assertEqual(session_state[auth.SESSION_KEY], "Earl_Staff")
             self.assertEqual(session_state[auth.SESSION_ROLE_KEY], "staff")
 
+    def test_signed_browser_session_restores_login_and_password_change_revokes_it(self) -> None:
+        users_file = self.root / "users.json"
+        session_state = {}
+        with (
+            patch.object(auth, "DATA_DIR", self.root),
+            patch.object(auth, "USERS_FILE", users_file),
+            patch.object(auth.st, "session_state", session_state),
+        ):
+            auth._save_users({
+                "student-1": {
+                    "password_hash": auth._hash_password("student-password"),
+                    "name": "Student One",
+                    "role": "student",
+                }
+            })
+            success, message = auth.login(
+                "student-1",
+                "student-password",
+                expected_role="student",
+            )
+            self.assertTrue(success, message)
+            token = auth.create_session_token()
+
+            session_state.clear()
+            self.assertTrue(auth.restore_session_token(token))
+            self.assertEqual(session_state[auth.SESSION_KEY], "student-1")
+            self.assertEqual(session_state[auth.SESSION_ROLE_KEY], "student")
+
+            session_state.clear()
+            encoded_payload, signature = token.rsplit(".", 1)
+            tampered_signature = ("0" if signature[0] != "0" else "1") + signature[1:]
+            self.assertFalse(
+                auth.restore_session_token(f"{encoded_payload}.{tampered_signature}")
+            )
+
+            users = auth._load_users()
+            users["student-1"]["password_hash"] = auth._hash_password("new-password")
+            auth._save_users(users)
+            self.assertFalse(auth.restore_session_token(token))
+
+    def test_signed_browser_session_expires(self) -> None:
+        users_file = self.root / "users.json"
+        session_state = {
+            auth.SESSION_KEY: "student-1",
+            auth.SESSION_ROLE_KEY: "student",
+        }
+        with (
+            patch.object(auth, "DATA_DIR", self.root),
+            patch.object(auth, "USERS_FILE", users_file),
+            patch.object(auth.st, "session_state", session_state),
+        ):
+            auth._save_users({
+                "student-1": {
+                    "password_hash": auth._hash_password("student-password"),
+                    "role": "student",
+                }
+            })
+            with patch.object(auth.time, "time", return_value=1_000):
+                token = auth.create_session_token()
+            with patch.object(
+                auth.time,
+                "time",
+                return_value=1_000 + auth.SESSION_COOKIE_TTL_SECONDS + 1,
+            ):
+                self.assertFalse(auth.restore_session_token(token))
+
     def test_bootstrap_admin_is_created_from_deployment_secrets_and_can_manage_staff(self) -> None:
         users_file = self.root / "users.json"
         session_state = {}

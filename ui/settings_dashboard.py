@@ -539,7 +539,11 @@ def render_advanced_settings(
                     st.error("Please fill in both current and new password fields.")
                 else:
                     users = auth._load_users()
-                    if current_uid in users and users[current_uid].get("password_hash") == auth._hash_password(old_pw):
+                    password_hash = users.get(current_uid, {}).get("password_hash")
+                    if (
+                        isinstance(password_hash, str)
+                        and auth._verify_password(old_pw, password_hash)
+                    ):
                         if len(new_pw) < 4:
                             st.error("New password must be at least 4 characters.")
                         else:

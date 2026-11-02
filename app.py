@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -25,6 +26,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import altair as alt
+import extra_streamlit_components as stx
 import pandas as pd
 import streamlit as st
 
@@ -222,6 +224,42 @@ def init_state() -> None:
         st.session_state["staff_section"] = requested_section
 
 
+def _restore_browser_login(cookie_manager) -> None:
+    token = cookie_manager.get(cookie=auth.SESSION_COOKIE_NAME)
+    if auth.is_logged_in():
+        if not token and not st.session_state.get("auth_cookie_initialized"):
+            _remember_browser_login(cookie_manager)
+        return
+    if not token:
+        return
+    if not auth.restore_session_token(token):
+        cookie_manager.delete(
+            auth.SESSION_COOKIE_NAME,
+            key="delete_invalid_auth_session",
+        )
+
+
+def _remember_browser_login(cookie_manager) -> None:
+    try:
+        token = auth.create_session_token()
+    except (auth.AccountStoreError, ValueError) as error:
+        st.warning(
+            f"You are signed in, but this browser could not save your login: {error}"
+        )
+        return
+    st.session_state["auth_cookie_initialized"] = True
+    cookie_manager.set(
+        auth.SESSION_COOKIE_NAME,
+        token,
+        key="save_auth_session",
+        path="/",
+        expires_at=datetime.now() + timedelta(seconds=auth.SESSION_COOKIE_TTL_SECONDS),
+        max_age=auth.SESSION_COOKIE_TTL_SECONDS,
+        secure=bool(os.environ.get("RENDER_SERVICE_ID")),
+        same_site="lax",
+    )
+
+
 def current_policy() -> dialogue.Policy:
     """The confidence policy in force, built from the Settings sliders.
 
@@ -337,7 +375,7 @@ def _render_student_shared_documents(student_id: str) -> None:
                     st.rerun()
 
 
-def render_sidebar() -> None:
+def render_sidebar(cookie_manager) -> None:
     session: dialogue.Session = st.session_state.session
     unlocked = staff_gate.is_unlocked()
     logged_in = auth.is_logged_in()
@@ -356,6 +394,11 @@ def render_sidebar() -> None:
             C.user_profile_card(user_name or user_id, user_role, online=True)
             if st.button("Logout", key="logout", width="stretch"):
                 auth.logout()
+                st.session_state.pop("auth_cookie_initialized", None)
+                cookie_manager.delete(
+                    auth.SESSION_COOKIE_NAME,
+                    key="logout_auth_session",
+                )
                 st.session_state.view = "login"
                 st.query_params["view"] = "login"
                 st.rerun()
@@ -1972,7 +2015,7 @@ def render_staff_login() -> None:
 # --------------------------------------------------------------------------
 # Unified login page (student or staff)
 # --------------------------------------------------------------------------
-def render_login() -> None:
+def render_login(cookie_manager) -> None:
     """Unified login page for students and staff."""
     if auth.is_logged_in():
         st.success("Already logged in. Redirecting...")
@@ -2019,6 +2062,7 @@ def render_login() -> None:
         else:
             success, message = auth.login(user_id, password, expected_role)
             if success:
+                _remember_browser_login(cookie_manager)
                 st.success(message)
                 if expected_role == "staff":
                     st.session_state.view = "dashboard"
@@ -2038,7 +2082,7 @@ def render_login() -> None:
 # --------------------------------------------------------------------------
 # Unified register page (student or staff)
 # --------------------------------------------------------------------------
-def render_register() -> None:
+def render_register(cookie_manager) -> None:
     """Public student-only account registration."""
     C.hero(
         "Create Account",
@@ -2072,7 +2116,11 @@ def render_register() -> None:
             if success:
                 st.success(message)
                 # Auto-login after registration
-                auth.login(user_id, password, "student")
+                success, login_message = auth.login(user_id, password, "student")
+                if not success:
+                    st.error(f"Your account was created, but automatic sign-in failed: {login_message}")
+                    return
+                _remember_browser_login(cookie_manager)
                 st.session_state.view = "chat"
                 st.query_params["view"] = "chat"
                 st.rerun()
@@ -2106,6 +2154,13 @@ def render_staff_login() -> None:
 
 # --------------------------------------------------------------------------
 def main() -> None:
+    cookie_manager = stx.CookieManager(key="auth_session_cookie_manager")
+    try:
+        _restore_browser_login(cookie_manager)
+    except auth.AccountStoreError as error:
+        st.error(f"Could not restore your sign-in because the account store is unavailable: {error}")
+        return
+
     init_state()
     theme.inject(st.session_state.get("app_theme", "dark"))
 
@@ -2121,7 +2176,7 @@ def main() -> None:
         view = "login"
 
     try:
-        render_sidebar()
+        render_sidebar(cookie_manager)
     except auth.AccountStoreError as error:
         st.error(f"The account database is unavailable: {error}")
         return
@@ -2137,9 +2192,9 @@ def main() -> None:
     elif view == "voice":
         render_voice()
     elif view == "login":
-        render_login()
+        render_login(cookie_manager)
     elif view == "register":
-        render_register()
+        render_register(cookie_manager)
     elif view == "staff_login":
         render_staff_login()
     elif view == "dashboard":
