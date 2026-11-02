@@ -16,7 +16,9 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
+import psycopg
 import streamlit as st
+from psycopg.types.json import Jsonb
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
@@ -122,8 +124,99 @@ def _ensure_bootstrap_admin(users: dict) -> bool:
     return True
 
 
+def _database_url() -> str:
+    database_url = _deployment_setting("DATABASE_URL")
+    if not database_url and os.environ.get("RENDER_SERVICE_ID"):
+        raise AccountStoreError(
+            "Persistent account storage is not configured. Set DATABASE_URL "
+            "to the PostgreSQL connection URL in the Render environment."
+        )
+    return database_url
+
+
+def _connect_to_database(database_url: str):
+    return psycopg.connect(database_url, sslmode="require")
+
+
+def _load_postgres_users(database_url: str) -> dict:
+    try:
+        with _connect_to_database(database_url) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS gra_accounts (
+                        user_id TEXT PRIMARY KEY,
+                        normalized_id TEXT NOT NULL UNIQUE,
+                        account_data JSONB NOT NULL
+                    )
+                    """
+                )
+                cursor.execute(
+                    "SELECT user_id, account_data FROM gra_accounts"
+                )
+                rows = cursor.fetchall()
+                users = {
+                    user_id: account_data
+                    for user_id, account_data in rows
+                }
+
+                migrate_json = os.environ.get(
+                    "MIGRATE_USERS_JSON_TO_DATABASE", ""
+                ).strip().casefold() in {"1", "true", "yes"}
+                if not users and migrate_json and USERS_FILE.is_file():
+                    legacy_users = json.loads(USERS_FILE.read_text(encoding="utf-8"))
+                    if not isinstance(legacy_users, dict) or any(
+                        not isinstance(user_id, str)
+                        or not isinstance(record, dict)
+                        for user_id, record in legacy_users.items()
+                    ):
+                        raise AccountStoreError(
+                            "The existing account file has an invalid format and "
+                            "could not be migrated."
+                        )
+                    _upsert_postgres_users(cursor, legacy_users)
+                    users = legacy_users
+    except AccountStoreError:
+        raise
+    except (psycopg.Error, OSError, json.JSONDecodeError) as error:
+        raise AccountStoreError(
+            f"Could not read the PostgreSQL account database: {error}"
+        ) from error
+    return users
+
+
+def _upsert_postgres_users(cursor, users: dict) -> None:
+    cursor.executemany(
+        """
+        INSERT INTO gra_accounts (user_id, normalized_id, account_data)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (user_id) DO UPDATE SET
+            normalized_id = EXCLUDED.normalized_id,
+            account_data = EXCLUDED.account_data
+        """,
+        [
+            (user_id, user_id.casefold(), Jsonb(record))
+            for user_id, record in users.items()
+        ],
+    )
+
+
 def _load_users() -> dict:
     with _ACCOUNT_LOCK:
+        database_url = _database_url()
+        if database_url:
+            users = _load_postgres_users(database_url)
+            if not isinstance(users, dict) or any(
+                not isinstance(user_id, str) or not isinstance(record, dict)
+                for user_id, record in users.items()
+            ):
+                raise AccountStoreError(
+                    "The PostgreSQL account database has an invalid format."
+                )
+            if _ensure_bootstrap_admin(users):
+                _save_users(users)
+            return users
+
         try:
             _ensure_data_dir()
             users = (
@@ -144,6 +237,27 @@ def _load_users() -> dict:
 
 
 def _save_users(users: dict) -> None:
+    database_url = _database_url()
+    if database_url:
+        try:
+            with _connect_to_database(database_url) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS gra_accounts (
+                            user_id TEXT PRIMARY KEY,
+                            normalized_id TEXT NOT NULL UNIQUE,
+                            account_data JSONB NOT NULL
+                        )
+                        """
+                    )
+                    _upsert_postgres_users(cursor, users)
+        except psycopg.Error as error:
+            raise AccountStoreError(
+                f"Could not save the PostgreSQL account database: {error}"
+            ) from error
+        return
+
     temporary_path = None
     try:
         _ensure_data_dir()

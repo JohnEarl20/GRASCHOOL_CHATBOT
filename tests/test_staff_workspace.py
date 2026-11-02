@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -9,9 +10,10 @@ if str(ROOT) not in sys.path:
 
 import tempfile
 import hashlib
+import json
 import unittest
 from datetime import datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from code import analytics_reports, auth, conversation, dialogue, handoff, knowledge, logger, staff_content
 
@@ -61,6 +63,95 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
             student = auth._load_users()["student-1"]
             self.assertEqual(student["role"], "student")
             self.assertTrue(student["password_hash"].startswith("pbkdf2_sha256$"))
+
+    def test_render_account_storage_requires_database_url(self) -> None:
+        with (
+            patch.dict("os.environ", {"RENDER_SERVICE_ID": "render-service"}, clear=True),
+            patch.object(auth, "_deployment_setting", return_value=""),
+        ):
+            with self.assertRaisesRegex(auth.AccountStoreError, "Set DATABASE_URL"):
+                auth._load_users()
+
+    def test_postgres_account_store_loads_and_saves_users(self) -> None:
+        user_record = {"name": "Student One", "role": "student"}
+        connection = MagicMock()
+        cursor = MagicMock()
+        connection.__enter__.return_value = connection
+        connection.cursor.return_value.__enter__.return_value = cursor
+        cursor.fetchall.return_value = [("student-1", user_record)]
+
+        with (
+            patch.dict(
+                "os.environ",
+                {"DATABASE_URL": "postgresql://test.invalid/db"},
+                clear=True,
+            ),
+            patch.object(
+                auth,
+                "_deployment_setting",
+                side_effect=lambda key: os.environ.get(key, ""),
+            ),
+            patch.object(
+                auth,
+                "_connect_to_database",
+                return_value=connection,
+            ) as connect_mock,
+        ):
+            users = auth._load_users()
+            self.assertEqual(users, {"student-1": user_record})
+
+            auth._save_users(users)
+
+        self.assertEqual(connect_mock.call_count, 2)
+        connect_mock.assert_called_with("postgresql://test.invalid/db")
+        cursor.executemany.assert_called_once()
+
+    def test_postgres_connections_require_ssl(self) -> None:
+        with patch.object(auth.psycopg, "connect") as connect_mock:
+            auth._connect_to_database("postgresql://test.invalid/db")
+
+        connect_mock.assert_called_once_with(
+            "postgresql://test.invalid/db",
+            sslmode="require",
+        )
+
+    def test_existing_json_accounts_can_be_migrated_to_postgres(self) -> None:
+        users_file = self.root / "users.json"
+        legacy_users = {
+            "student-1": {
+                "password_hash": "existing-hash",
+                "name": "Student One",
+                "role": "student",
+            }
+        }
+        users_file.write_text(
+            json.dumps(legacy_users),
+            encoding="utf-8",
+        )
+        connection = MagicMock()
+        cursor = MagicMock()
+        connection.__enter__.return_value = connection
+        connection.cursor.return_value.__enter__.return_value = cursor
+        cursor.fetchall.return_value = []
+
+        with (
+            patch.object(auth, "USERS_FILE", users_file),
+            patch.dict(
+                "os.environ",
+                {"MIGRATE_USERS_JSON_TO_DATABASE": "true"},
+            ),
+            patch.object(
+                auth,
+                "_connect_to_database",
+                return_value=connection,
+            ),
+        ):
+            migrated = auth._load_postgres_users(
+                "postgresql://test.invalid/db"
+            )
+
+        self.assertEqual(migrated, legacy_users)
+        cursor.executemany.assert_called_once()
 
     def test_staff_login_ignores_id_letter_case(self) -> None:
         users_file = self.root / "users.json"

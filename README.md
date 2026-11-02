@@ -38,6 +38,27 @@ The repository includes a Render Blueprint in `render.yaml`. In Render, choose
 starts Streamlit on Render's assigned port, and checks Streamlit's health
 endpoint.
 
+#### Keep student accounts after redeploys
+
+Render's local filesystem is temporary, so the deployed app requires PostgreSQL
+for accounts. Create a Supabase project, then open **Connect** in the project
+dashboard and select the **Session pooler** connection string. Use the session
+pooler because Render may need an IPv4-compatible connection. In the Render web
+service's **Environment** settings, add `DATABASE_URL` with the full connection
+string, replacing its password placeholder. The app requires encrypted
+PostgreSQL connections. Keep this value private and do not commit it to GitHub.
+Use Supabase's session pooler, not its transaction pooler.
+
+Set `DATABASE_URL` before deploying this account-storage change. If the
+existing Render instance still has `data/users.json`, set
+`MIGRATE_USERS_JSON_TO_DATABASE=true` in Render before the first database
+connection to import its student and staff accounts. Verify that those
+accounts can log in, then remove that migration variable. If the old file is
+already gone, those accounts cannot be recovered from the new database and
+must be recreated. The migration only works if that JSON file is still present
+on the currently running Render instance; it cannot recover local computer
+files or data already lost during a restart.
+
 When prompted for `BOOTSTRAP_ADMIN_ID` and `BOOTSTRAP_ADMIN_PASSWORD`, enter
 the initial staff administrator ID and a unique password of at least eight
 characters. Keep the password in Render's environment settings only; never
@@ -45,10 +66,12 @@ commit it to GitHub. The administrator is created on first account-store
 access. For an already-created web service that is not managed by a Blueprint,
 set these same variables under **Environment** in that service and redeploy.
 
-Render's free service has an ephemeral filesystem. Accounts, conversations,
-documents, and other local data can be lost when the service restarts or
-deploys. Do not rely on it for durable school records without moving data to
-persistent storage or a database.
+Student and staff accounts are stored in Supabase PostgreSQL when
+`DATABASE_URL` is configured. Other app data (including conversations and
+uploaded documents) still uses local files and can be lost when the free Render
+service restarts or deploys. Supabase's free-tier availability and usage limits
+also apply; check the current Supabase plan details before relying on it for
+official school records.
 
 ### 3. Run Regression Checks & Tests
 
