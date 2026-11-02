@@ -6,7 +6,7 @@ import io
 import os
 import pickle
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Callable
@@ -141,6 +141,120 @@ def _questions() -> list[dict]:
         if row.get("event") != "feedback" and row.get("intent") != "voice_recording"
     ]
     return sorted(rows, key=lambda row: str(row.get("ts", "")), reverse=True)
+
+
+def _question_review_rows(
+    log_rows: list[dict] | None = None,
+    conversations: list[dict] | None = None,
+) -> list[dict]:
+    """Combine assistant analytics with student messages, including staff-routed turns."""
+    logs = _questions() if log_rows is None else [
+        row for row in log_rows
+        if row.get("event") != "feedback" and row.get("intent") != "voice_recording"
+    ]
+    logs.sort(key=lambda row: str(row.get("ts", "")), reverse=True)
+    conversation_rows = (
+        conversation.get_all_conversations()
+        if conversations is None
+        else conversations
+    )
+
+    logs_by_question: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for row in logs:
+        key = (str(row.get("session_id", "")), str(row.get("text", "")))
+        logs_by_question[key].append(row)
+
+    review_rows: list[dict] = []
+    matched_log_ids: set[int] = set()
+    for conv in conversation_rows:
+        session_id = str(conv.get("session_id", ""))
+        messages = conv.get("messages", [])
+        for index, message in enumerate(messages):
+            if message.get("role") != "student":
+                continue
+            text = str(message.get("text", "")).strip()
+            if (
+                not text
+                or text.startswith("🎙️")
+                or message.get("meta", {}).get("intent") == "voice_recording"
+            ):
+                continue
+
+            key = (session_id, text)
+            matches = logs_by_question.get(key, [])
+            logged = matches.pop() if matches else None
+            if logged is not None:
+                matched_log_ids.add(id(logged))
+
+            following = []
+            for next_message in messages[index + 1:]:
+                if next_message.get("role") == "student":
+                    break
+                following.append(next_message)
+            staff_replied = any(item.get("role") == "staff" for item in following)
+            assistant_message = next(
+                (item for item in following if item.get("role") == "assistant"),
+                {},
+            )
+            meta = logged or assistant_message.get("meta", {})
+            intent = str(meta.get("intent") or "Unknown")
+            routed_to_staff = (
+                intent == "staff_notified"
+                or "staff routing" in str(meta.get("source", "")).casefold()
+            )
+            if logged is not None:
+                status = (
+                    "Unanswered" if not logged.get("answered")
+                    else "Sent to staff" if logged.get("escalated")
+                    else "AI answered"
+                )
+            elif staff_replied:
+                status = "Staff replied"
+            elif routed_to_staff or conv.get("status") == "waiting":
+                status = "Sent to staff"
+            elif assistant_message and assistant_message.get("meta", {}).get("answered") is False:
+                status = "Unanswered"
+            elif assistant_message:
+                status = "AI answered"
+            else:
+                status = "Awaiting response"
+
+            review_rows.append({
+                "_review_id": f"{session_id}:{message.get('id', index)}",
+                "ts": message.get("timestamp") or (logged or {}).get("ts", ""),
+                "student_name": conv.get("student_name"),
+                "student_id": conv.get("student_id"),
+                "text": text,
+                "intent": "Staff hand-off" if routed_to_staff else intent,
+                "confidence": meta.get("confidence"),
+                "answered": status != "Unanswered",
+                "escalated": routed_to_staff or bool(meta.get("escalated")),
+                "status": status,
+                "session_id": session_id,
+            })
+
+    for index, row in enumerate(logs):
+        if id(row) in matched_log_ids:
+            continue
+        status = (
+            "Unanswered" if not row.get("answered")
+            else "Sent to staff" if row.get("escalated")
+            else "AI answered"
+        )
+        review_rows.append({
+            **row,
+            "_review_id": (
+                f"log:{row.get('session_id', '')}:{row.get('ts', '')}:"
+                f"{index}:{row.get('text', '')}"
+            ),
+            "status": status,
+        })
+
+    return sorted(
+        review_rows,
+        key=lambda row: str(row.get("ts", "")),
+        reverse=True,
+    )
 
 
 def _category(row: dict) -> str:
@@ -1390,15 +1504,19 @@ def render_analytics(audit_fn: Callable[[str, str], None]) -> None:
     )
 
 
-@st.fragment(run_every=5)
+@st.fragment(run_every=2)
 def _render_live_question_review(audit_fn: Callable[[str, str], None]) -> None:
-    missed = forecast.unanswered(_questions())
-    if not missed:
-        st.info("No unanswered questions are recorded. New student questions will appear automatically.")
-        st.caption(f"Last checked {datetime.now().astimezone().strftime('%H:%M:%S')} · updates every 5 seconds")
+    questions = _question_review_rows()
+    if not questions:
+        st.info("No student questions are recorded. New messages will appear automatically.")
+        st.caption(f"Last checked {datetime.now().astimezone().strftime('%H:%M:%S')} · refreshes every 2 seconds")
         return
-    st.caption(f"{len(missed)} unanswered questions are available for staff review.")
-    st.caption(f"Live updates every 5 seconds · last checked {datetime.now().astimezone().strftime('%H:%M:%S')}")
+    unanswered_count = sum(row["status"] == "Unanswered" for row in questions)
+    st.caption(
+        f"{len(questions)} student messages · {unanswered_count} unanswered · "
+        f"refreshes every 2 seconds · last checked "
+        f"{datetime.now().astimezone().strftime('%H:%M:%S')}"
+    )
     review_rows = [
         {
             "Date": str(row.get("ts", "")).replace("T", " ")[:19] or "Unknown",
@@ -1411,10 +1529,11 @@ def _render_live_question_review(audit_fn: Callable[[str, str], None]) -> None:
                 if isinstance(row.get("confidence"), (int, float))
                 else "Not available"
             ),
+            "Status": row.get("status", "Unknown"),
             "Escalated": "Yes" if row.get("escalated") else "No",
             "Reference": str(row.get("session_id") or "Not available"),
         }
-        for row in missed
+        for row in questions
     ]
     st.dataframe(
         pd.DataFrame(review_rows),
@@ -1423,12 +1542,20 @@ def _render_live_question_review(audit_fn: Callable[[str, str], None]) -> None:
         height=min(600, max(180, 38 + 35 * len(review_rows))),
     )
     st.markdown("### Classify a question")
-    options = [
-        f"{str(row.get('ts', ''))[:19]} · {str(row.get('text', ''))[:100]}"
-        for row in missed
-    ]
-    selected_index = st.selectbox("Select a question to classify", range(len(options)), format_func=lambda value: options[value], key="staff_review_question")
-    question = missed[selected_index]
+    question_by_id = {row["_review_id"]: row for row in questions}
+    option_labels = {
+        row["_review_id"]: (
+            f"{str(row.get('ts', ''))[:19]} · {str(row.get('text', ''))[:100]}"
+        )
+        for row in questions
+    }
+    selected_id = st.selectbox(
+        "Select a question to classify",
+        list(question_by_id),
+        format_func=option_labels.__getitem__,
+        key="staff_review_question",
+    )
+    question = question_by_id[selected_id]
     st.info(question.get("text", ""))
     intents = sorted({row["intent"] for row in intent_model.load_corpus()})
     if not intents:
@@ -1438,7 +1565,7 @@ def _render_live_question_review(audit_fn: Callable[[str, str], None]) -> None:
     if st.button("Save staff label", type="primary", key="staff_save_review"):
         intent_model.add_staff_label(str(question.get("text", "")), intent)
         audit_fn(
-            f"Classified an unanswered question as {intent}",
+            f"Classified a student question as {intent}",
             auth.get_current_user_name() or auth.get_current_user_id() or "staff",
         )
         st.success("Staff label saved to the existing training corpus.")

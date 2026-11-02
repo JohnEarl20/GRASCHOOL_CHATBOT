@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 from code import analytics_reports, auth, conversation, dialogue, handoff, knowledge, logger, staff_content
+from ui import staff_workspace
 
 
 class StaffWorkspaceStorageTests(unittest.TestCase):
@@ -765,6 +766,95 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
             dialogue._log("Where can I pay?", reply, session, "student-1", "Student One")
 
             self.assertEqual(logger.read_logs()[0]["session_id"], created["session_id"])
+
+    def test_question_review_includes_live_student_messages_and_deduplicates_logs(self) -> None:
+        logs = [
+            {
+                "session_id": "session-1",
+                "text": "What are the requirements?",
+                "ts": "2026-11-02T10:00:01",
+                "intent": "ask_requirements",
+                "confidence": 0.9,
+                "answered": True,
+            },
+            {
+                "session_id": "old-session",
+                "text": "Unknown question",
+                "ts": "2026-11-02T09:00:00",
+                "intent": "unknown",
+                "confidence": 0.2,
+                "answered": False,
+            },
+            {
+                "event": "feedback",
+                "session_id": "session-1",
+                "text": "Thanks",
+                "answered": True,
+            },
+        ]
+        conversations = [
+            {
+                "session_id": "session-1",
+                "student_id": "student-1",
+                "student_name": "Student One",
+                "status": "waiting",
+                "messages": [
+                    {
+                        "id": "message-1",
+                        "role": "student",
+                        "text": "What are the requirements?",
+                        "timestamp": "2026-11-02T10:00:00",
+                    },
+                    {
+                        "id": "message-2",
+                        "role": "assistant",
+                        "text": "Here are the requirements.",
+                        "meta": {
+                            "intent": "ask_requirements",
+                            "confidence": 0.9,
+                            "answered": True,
+                        },
+                    },
+                    {
+                        "id": "message-3",
+                        "role": "student",
+                        "text": "Please connect me to staff.",
+                        "timestamp": "2026-11-02T10:01:00",
+                    },
+                    {
+                        "id": "message-4",
+                        "role": "assistant",
+                        "text": "Your message is saved in the staff queue.",
+                        "meta": {
+                            "intent": "staff_notified",
+                            "source": "conversation - staff routing",
+                        },
+                    },
+                    {
+                        "id": "message-5",
+                        "role": "student",
+                        "text": "Voice recording",
+                        "timestamp": "2026-11-02T10:02:00",
+                        "meta": {"intent": "voice_recording"},
+                    },
+                ],
+            }
+        ]
+
+        rows = staff_workspace._question_review_rows(logs, conversations)
+
+        self.assertEqual(
+            [row["text"] for row in rows],
+            [
+                "Please connect me to staff.",
+                "What are the requirements?",
+                "Unknown question",
+            ],
+        )
+        self.assertEqual(rows[0]["status"], "Sent to staff")
+        self.assertEqual(rows[0]["intent"], "Staff hand-off")
+        self.assertEqual(rows[1]["status"], "AI answered")
+        self.assertEqual(rows[2]["status"], "Unanswered")
 
     def test_student_recent_conversations_are_isolated_by_student_id(self) -> None:
         conversations_dir = self.root / "conversations"
