@@ -104,14 +104,16 @@ restoration, logout cleanup, staff workflows, and conversation storage.
 
 The application implements a unified authentication system (`code/auth.py`) with salted PBKDF2-SHA256 password hashes and role separation. Existing SHA-256 student credentials remain valid and are verified during login. Account data uses `data/users.json` for local development; when `DATABASE_URL` is configured, student and staff accounts use PostgreSQL instead. Keep account files and database credentials private; do not commit them:
 
-Successful logins are remembered in a signed, browser-specific cookie for up to
-30 days, so refreshing the page or reconnecting from the same browser does not
-send the user back to Login. The app reads the cookie from the initial browser
-request before checking protected-page access, avoiding an asynchronous
-component-read race during refresh. The cookie is bound to the account's
-password hash, so changing the password or removing the account invalidates it.
-Logout expires the cookie on that browser. Each phone, computer, or browser
-needs its own initial sign-in; use Logout on shared devices.
+Successful logins are remembered in a signed, browser-specific cookie, so
+refreshing or reopening the app in the same browser does not send the user back
+to Login. The app reads the cookie from the initial browser request before
+checking protected-page access, avoiding an asynchronous component-read race.
+The cookie is renewed while that browser uses the app and has a 400-day
+inactivity lifetime (subject to browser cookie policies). Its signature is
+bound to the account's password hash, so changing the password or removing the
+account invalidates it. Logout expires the cookie on that browser. Each phone,
+computer, or browser needs its own initial sign-in; use Logout on shared
+devices.
 
 - **🎓 Student Accounts**:
   - Access to the **AI Assistant** conversation interface.

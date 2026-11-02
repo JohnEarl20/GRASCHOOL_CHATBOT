@@ -230,13 +230,17 @@ def _restore_browser_login(cookie_manager) -> None:
         _delete_browser_login(cookie_manager, "clear_logged_out_auth_session")
         return
     if auth.is_logged_in():
-        if not token and not st.session_state.get("auth_cookie_initialized"):
+        if token:
+            _set_browser_login_cookie(cookie_manager, token, "refresh_auth_session")
+        elif not st.session_state.get("auth_cookie_initialized"):
             _remember_browser_login(cookie_manager)
         return
     if not token:
         return
     if not auth.restore_session_token(token):
         _delete_browser_login(cookie_manager, "delete_invalid_auth_session")
+    else:
+        _remember_browser_login(cookie_manager)
 
 
 def _delete_browser_login(cookie_manager, key: str) -> None:
@@ -252,6 +256,19 @@ def _delete_browser_login(cookie_manager, key: str) -> None:
     )
 
 
+def _set_browser_login_cookie(cookie_manager, token: str, key: str) -> None:
+    cookie_manager.set(
+        auth.SESSION_COOKIE_NAME,
+        token,
+        key=key,
+        path="/",
+        expires_at=datetime.now() + timedelta(seconds=auth.SESSION_COOKIE_MAX_AGE_SECONDS),
+        max_age=auth.SESSION_COOKIE_MAX_AGE_SECONDS,
+        secure=bool(os.environ.get("RENDER_SERVICE_ID")),
+        same_site="lax",
+    )
+
+
 def _remember_browser_login(cookie_manager) -> None:
     try:
         token = auth.create_session_token()
@@ -262,16 +279,7 @@ def _remember_browser_login(cookie_manager) -> None:
         return
     st.session_state.pop("auth_cookie_cleared", None)
     st.session_state["auth_cookie_initialized"] = True
-    cookie_manager.set(
-        auth.SESSION_COOKIE_NAME,
-        token,
-        key="save_auth_session",
-        path="/",
-        expires_at=datetime.now() + timedelta(seconds=auth.SESSION_COOKIE_TTL_SECONDS),
-        max_age=auth.SESSION_COOKIE_TTL_SECONDS,
-        secure=bool(os.environ.get("RENDER_SERVICE_ID")),
-        same_site="lax",
-    )
+    _set_browser_login_cookie(cookie_manager, token, "save_auth_session")
 
 
 def current_policy() -> dialogue.Policy:

@@ -397,7 +397,7 @@ Sa kaliwa, makikita mo:
 3. **This session** — natatandaan ba ng bot ang student type at documents mo?
 4. **Start over** — i-reset ang session
 
-Kapag **Student**, nakatago ang staff-only pages. Kapag **Staff**, lumalabas ang staff workspace at dashboard. Pagkatapos mag-login, naaalala ng parehong browser ang session nang hanggang 30 araw para hindi bumalik sa Login sa simpleng refresh. Kailangang mag-login nang hiwalay sa bawat browser o device. Binubura ng Logout ang session cookie; binabago rin ng password ang lumang session.
+Kapag **Student**, nakatago ang staff-only pages. Kapag **Staff**, lumalabas ang staff workspace at dashboard. Pagkatapos mag-login, naaalala ng browser ang session kahit mag-refresh o muling buksan ang app. Kusang pinahahaba ang cookie habang ginagamit ang app; may 400-araw na palugit kapag hindi aktibo at maaari ring burahin ng browser ang cookies. Kailangang mag-login nang hiwalay sa bawat browser o device. Binubura ng Logout ang session cookie sa browser na iyon; binabago rin ng password ang lumang session.
 
 ### E. Voice Upload
 
@@ -566,7 +566,7 @@ Maging tapat tayo. Ito ang mga bagay na hindi pa tapos:
 | **Voice recording** | ✅ Gumagana | Totoong mikropono ng browser + upload ng file |
 | **Speech-to-text** | ⛔ Sinadyang alisin | Walang speech recognition — type lang ang tanong |
 | **LLM rewording** | ❌ Naka-off | Walang provider na konektado |
-| **Authentication** | ✅ Gumagana | Role-based login; student self-registration; staff accounts para lang sa authorized admin; signed browser session cookie hanggang 30 araw |
+| **Authentication** | ✅ Gumagana | Role-based login; student self-registration; staff accounts para lang sa authorized admin; device-specific signed cookie na nire-renew kapag ginagamit ang app, at binubura sa Logout |
 | **Tunay na datos** | ❌ DRAFT pa | Placeholder lang ang mga numero |
 | **Log masking** | ❌ Wala pa | Hindi pa nafi-filter ang personal data |
 | **Fairness check** | ❌ Wala pa | Kailangan ng 50 unseen questions |

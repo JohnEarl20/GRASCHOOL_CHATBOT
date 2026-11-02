@@ -216,7 +216,7 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
             auth._save_users(users)
             self.assertFalse(auth.restore_session_token(token))
 
-    def test_signed_browser_session_expires(self) -> None:
+    def test_signed_browser_session_remains_valid_until_revoked(self) -> None:
         users_file = self.root / "users.json"
         session_state = {
             auth.SESSION_KEY: "student-1",
@@ -238,9 +238,58 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
             with patch.object(
                 auth.time,
                 "time",
+                return_value=1_000 + 5 * 365 * 24 * 60 * 60,
+            ):
+                session_state.clear()
+                self.assertTrue(auth.restore_session_token(token))
+
+    def test_expired_legacy_browser_session_is_rejected(self) -> None:
+        users_file = self.root / "users.json"
+        session_state = {
+            auth.SESSION_KEY: "student-1",
+            auth.SESSION_ROLE_KEY: "student",
+        }
+        with (
+            patch.object(auth, "DATA_DIR", self.root),
+            patch.object(auth, "USERS_FILE", users_file),
+            patch.object(auth.st, "session_state", session_state),
+        ):
+            password_hash = auth._hash_password("student-password")
+            auth._save_users({
+                "student-1": {
+                    "password_hash": password_hash,
+                    "role": "student",
+                }
+            })
+            with patch.object(auth.time, "time", return_value=1_000):
+                token = auth.create_session_token()
+            encoded_payload, _ = token.split(".", 1)
+            payload = json.loads(
+                auth.base64.urlsafe_b64decode(
+                    encoded_payload + "=" * (-len(encoded_payload) % 4)
+                )
+            )
+            payload["expires_at"] = 1_000 + auth.SESSION_COOKIE_TTL_SECONDS
+            encoded_payload = auth.base64.urlsafe_b64encode(
+                json.dumps(payload, separators=(",", ":")).encode("utf-8")
+            ).rstrip(b"=").decode("ascii")
+            signing_key = hashlib.sha256(
+                f"gra-auth-session-v1:{password_hash}".encode("utf-8")
+            ).digest()
+            signature = auth.hmac.new(
+                signing_key,
+                encoded_payload.encode("ascii"),
+                hashlib.sha256,
+            ).hexdigest()
+            legacy_token = f"{encoded_payload}.{signature}"
+
+            with patch.object(
+                auth.time,
+                "time",
                 return_value=1_000 + auth.SESSION_COOKIE_TTL_SECONDS + 1,
             ):
-                self.assertFalse(auth.restore_session_token(token))
+                session_state.clear()
+                self.assertFalse(auth.restore_session_token(legacy_token))
 
     def test_browser_login_restores_from_initial_request_cookie(self) -> None:
         import app
@@ -254,11 +303,58 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
             patch.object(app.st, "session_state", {}),
             patch.object(app.auth, "is_logged_in", return_value=False),
             patch.object(app.auth, "restore_session_token", return_value=True) as restore,
+            patch.object(app, "_remember_browser_login") as remember,
         ):
             app._restore_browser_login(cookie_manager)
 
         restore.assert_called_once_with(token)
+        remember.assert_called_once_with(cookie_manager)
         cookie_manager.get.assert_not_called()
+
+    def test_authenticated_browser_refresh_renews_its_cookie(self) -> None:
+        import app
+
+        cookie_manager = MagicMock()
+        token = "current-device-session"
+        streamlit_context = MagicMock()
+        streamlit_context.cookies = {auth.SESSION_COOKIE_NAME: token}
+        with (
+            patch.object(app.st, "context", streamlit_context),
+            patch.object(
+                app.st,
+                "session_state",
+                {"auth_cookie_initialized": True},
+            ),
+            patch.object(app.auth, "is_logged_in", return_value=True),
+        ):
+            app._restore_browser_login(cookie_manager)
+
+        cookie_manager.set.assert_called_once()
+        self.assertEqual(cookie_manager.set.call_args.args[1], token)
+        self.assertEqual(
+            cookie_manager.set.call_args.kwargs["max_age"],
+            auth.SESSION_COOKIE_MAX_AGE_SECONDS,
+        )
+
+    def test_remembered_browser_login_uses_long_lived_device_cookie(self) -> None:
+        import app
+
+        cookie_manager = MagicMock()
+        with (
+            patch.object(app.st, "session_state", {}),
+            patch.object(app.auth, "create_session_token", return_value="signed-token"),
+        ):
+            app._remember_browser_login(cookie_manager)
+
+        self.assertEqual(
+            cookie_manager.set.call_args.args[:2],
+            (auth.SESSION_COOKIE_NAME, "signed-token"),
+        )
+        self.assertEqual(
+            cookie_manager.set.call_args.kwargs["max_age"],
+            auth.SESSION_COOKIE_MAX_AGE_SECONDS,
+        )
+        self.assertIsNotNone(cookie_manager.set.call_args.kwargs["expires_at"])
 
     def test_browser_logout_does_not_restore_stale_request_cookie(self) -> None:
         import app

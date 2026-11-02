@@ -31,6 +31,7 @@ SESSION_KEY = "user_id"
 SESSION_ROLE_KEY = "user_role"
 SESSION_COOKIE_NAME = "gra_auth_session"
 SESSION_COOKIE_TTL_SECONDS = 30 * 24 * 60 * 60
+SESSION_COOKIE_MAX_AGE_SECONDS = 400 * 24 * 60 * 60
 PASSWORD_SCHEME = "pbkdf2_sha256"
 PASSWORD_ITERATIONS = 600_000
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -492,7 +493,7 @@ def logout() -> None:
 
 
 def create_session_token() -> str:
-    """Create a signed, expiring token for restoring this browser's login."""
+    """Create a signed token for restoring this browser's login until revoked."""
     user_id = get_current_user_id()
     if not user_id:
         raise ValueError("An authenticated account is required to create a session token.")
@@ -506,7 +507,6 @@ def create_session_token() -> str:
 
     payload = {
         "user_id": user_id,
-        "expires_at": int(time.time()) + SESSION_COOKIE_TTL_SECONDS,
         "nonce": secrets.token_urlsafe(16),
     }
     encoded_payload = base64.urlsafe_b64encode(
@@ -524,7 +524,10 @@ def create_session_token() -> str:
 
 
 def restore_session_token(token: str) -> bool:
-    """Restore a login only when its signature, expiry, and account still match."""
+    """Restore a login only when its signature and account still match.
+
+    The expiry check remains for tokens issued by the previous 30-day format.
+    """
     if not isinstance(token, str) or len(token) > 2048:
         return False
     encoded_payload, separator, supplied_signature = token.partition(".")
@@ -551,12 +554,17 @@ def restore_session_token(token: str) -> bool:
     if (
         not isinstance(user_id, str)
         or not user_id
-        or not isinstance(expires_at, int)
-        or isinstance(expires_at, bool)
         or not isinstance(nonce, str)
         or not nonce
-        or expires_at <= int(time.time())
-        or expires_at > int(time.time()) + SESSION_COOKIE_TTL_SECONDS + 60
+        or (
+            expires_at is not None
+            and (
+                not isinstance(expires_at, int)
+                or isinstance(expires_at, bool)
+                or expires_at <= int(time.time())
+                or expires_at > int(time.time()) + SESSION_COOKIE_TTL_SECONDS + 60
+            )
+        )
     ):
         return False
 
