@@ -3,7 +3,11 @@
 # environment, from .env, or from .streamlit/secrets.toml - and stays locked
 # when none of them is set, so nothing secret is needed in the repository.
 .env
+.env.*
+!.env.example
 .streamlit/secrets.toml
+*.pem
+*.key
 
 # --- staff-authored content and student-facing files ---------------------
 data/knowledge_articles.json
@@ -12,6 +16,13 @@ data/staff_documents.json
 data/staff_documents/
 data/staff_reports/
 data/users.json
+data/chat_log.jsonl
+data/harvested_chat_queries.csv
+data/staff_labeled_queries.csv
+data/conversations/
+data/backups/
+data/staff_presence.json
+data/app_prefs.json
 
 # --- editor / agent workspace artifacts ----------------------------------
 # These are Code Janitor's own memory files. They are not imported by any
