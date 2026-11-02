@@ -242,6 +242,46 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
             ):
                 self.assertFalse(auth.restore_session_token(token))
 
+    def test_browser_login_restores_from_initial_request_cookie(self) -> None:
+        import app
+
+        cookie_manager = MagicMock()
+        token = "signed-browser-session"
+        streamlit_context = MagicMock()
+        streamlit_context.cookies = {auth.SESSION_COOKIE_NAME: token}
+        with (
+            patch.object(app.st, "context", streamlit_context),
+            patch.object(app.st, "session_state", {}),
+            patch.object(app.auth, "is_logged_in", return_value=False),
+            patch.object(app.auth, "restore_session_token", return_value=True) as restore,
+        ):
+            app._restore_browser_login(cookie_manager)
+
+        restore.assert_called_once_with(token)
+        cookie_manager.get.assert_not_called()
+
+    def test_browser_logout_does_not_restore_stale_request_cookie(self) -> None:
+        import app
+
+        cookie_manager = MagicMock()
+        streamlit_context = MagicMock()
+        streamlit_context.cookies = {auth.SESSION_COOKIE_NAME: "old-session"}
+        session_state = {"auth_cookie_cleared": True}
+        with (
+            patch.object(app.st, "context", streamlit_context),
+            patch.object(app.st, "session_state", session_state),
+            patch.object(app.auth, "restore_session_token") as restore,
+        ):
+            app._restore_browser_login(cookie_manager)
+
+        restore.assert_not_called()
+        cookie_manager.set.assert_called_once()
+        self.assertEqual(
+            cookie_manager.set.call_args.args[:2],
+            (auth.SESSION_COOKIE_NAME, ""),
+        )
+        self.assertEqual(cookie_manager.set.call_args.kwargs["max_age"], 0)
+
     def test_bootstrap_admin_is_created_from_deployment_secrets_and_can_manage_staff(self) -> None:
         users_file = self.root / "users.json"
         session_state = {}

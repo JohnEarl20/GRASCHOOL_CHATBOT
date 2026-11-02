@@ -225,7 +225,10 @@ def init_state() -> None:
 
 
 def _restore_browser_login(cookie_manager) -> None:
-    token = cookie_manager.get(cookie=auth.SESSION_COOKIE_NAME)
+    token = st.context.cookies.get(auth.SESSION_COOKIE_NAME)
+    if st.session_state.get("auth_cookie_cleared"):
+        _delete_browser_login(cookie_manager, "clear_logged_out_auth_session")
+        return
     if auth.is_logged_in():
         if not token and not st.session_state.get("auth_cookie_initialized"):
             _remember_browser_login(cookie_manager)
@@ -233,10 +236,20 @@ def _restore_browser_login(cookie_manager) -> None:
     if not token:
         return
     if not auth.restore_session_token(token):
-        cookie_manager.delete(
-            auth.SESSION_COOKIE_NAME,
-            key="delete_invalid_auth_session",
-        )
+        _delete_browser_login(cookie_manager, "delete_invalid_auth_session")
+
+
+def _delete_browser_login(cookie_manager, key: str) -> None:
+    cookie_manager.set(
+        auth.SESSION_COOKIE_NAME,
+        "",
+        key=key,
+        path="/",
+        expires_at=datetime.now() - timedelta(seconds=1),
+        max_age=0,
+        secure=bool(os.environ.get("RENDER_SERVICE_ID")),
+        same_site="lax",
+    )
 
 
 def _remember_browser_login(cookie_manager) -> None:
@@ -247,6 +260,7 @@ def _remember_browser_login(cookie_manager) -> None:
             f"You are signed in, but this browser could not save your login: {error}"
         )
         return
+    st.session_state.pop("auth_cookie_cleared", None)
     st.session_state["auth_cookie_initialized"] = True
     cookie_manager.set(
         auth.SESSION_COOKIE_NAME,
@@ -394,11 +408,9 @@ def render_sidebar(cookie_manager) -> None:
             C.user_profile_card(user_name or user_id, user_role, online=True)
             if st.button("Logout", key="logout", width="stretch"):
                 auth.logout()
+                st.session_state["auth_cookie_cleared"] = True
                 st.session_state.pop("auth_cookie_initialized", None)
-                cookie_manager.delete(
-                    auth.SESSION_COOKIE_NAME,
-                    key="logout_auth_session",
-                )
+                _delete_browser_login(cookie_manager, "logout_auth_session")
                 st.session_state.view = "login"
                 st.query_params["view"] = "login"
                 st.rerun()
@@ -2071,7 +2083,6 @@ def render_login(cookie_manager) -> None:
                 else:
                     st.session_state.view = "chat"
                     st.query_params["view"] = "chat"
-                st.rerun()
             else:
                 st.error(message)
 
@@ -2123,7 +2134,6 @@ def render_register(cookie_manager) -> None:
                 _remember_browser_login(cookie_manager)
                 st.session_state.view = "chat"
                 st.query_params["view"] = "chat"
-                st.rerun()
             else:
                 st.error(message)
 
