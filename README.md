@@ -43,7 +43,7 @@ python tests/test_app.py
 
 ## Authentication & Role-Based Access Control
 
-The application implements a unified authentication system (`code/auth.py`) with password hashing via SHA-256 and role separation. Account data is stored locally in `data/users.json` and is not included in the repository:
+The application implements a unified authentication system (`code/auth.py`) with salted PBKDF2-SHA256 password hashes and role separation. Existing SHA-256 student credentials remain valid and are verified during login. Account data is stored locally in `data/users.json` and is not included in the repository:
 
 - **🎓 Student Accounts**:
   - Access to the **AI Assistant** conversation interface.
@@ -52,9 +52,40 @@ The application implements a unified authentication system (`code/auth.py`) with
 
 - **👨‍🏫 Staff Accounts**:
   - Access to the staff-only workspace: dashboard, inquiry/support conversations, question review, verified knowledge articles, documents, announcements, analytics, and staff settings.
-  - Only an authenticated staff member can provision another staff account. Public registration creates student accounts only.
+  - Public registration creates student accounts only. Staff self-registration and staff account creation by ordinary staff accounts are disabled.
+  - Authorized administrators can create staff accounts through **Staff Management**. The account is saved to the existing `data/users.json` store with a unique Staff ID and Official Email, and the staff member can log in immediately.
 
-Students can register through the **Create Account** sidebar view. Staff accounts are provisioned from the staff-only User Management settings.
+### Configure Staff Administrators
+
+Staff Management is restricted to staff IDs explicitly allowlisted by the deployment owner. Add one or more existing staff IDs to `STAFF_ADMIN_IDS` in the server environment or `.env` file, separated by commas:
+
+```dotenv
+STAFF_ADMIN_IDS=registrar-admin-01,school-admin-02
+```
+
+For Streamlit Community Cloud, configure the IDs in app secrets:
+
+```toml
+STAFF_ADMIN_IDS = ["registrar-admin-01", "school-admin-02"]
+```
+
+The allowlisted IDs must already belong to staff accounts. Do not configure student IDs or grant the setting to every staff account.
+
+Students can register through the **Create Account** sidebar view. Staff accounts are provisioned only from the admin-only **Staff Management** page.
+
+If a deployment has no `data/users.json` yet, the deployment owner can create its first administrator through private environment variables or Streamlit secrets:
+
+```toml
+BOOTSTRAP_ADMIN_ID = "registrar-admin-01"
+BOOTSTRAP_ADMIN_PASSWORD = "use-a-unique-secret-password"
+BOOTSTRAP_ADMIN_NAME = "Registrar Administrator"
+BOOTSTRAP_ADMIN_EMAIL = "registrar-admin@gra.edu"
+BOOTSTRAP_ADMIN_DEPARTMENT = "Registrar"
+```
+
+Both `BOOTSTRAP_ADMIN_ID` and `BOOTSTRAP_ADMIN_PASSWORD` are required for bootstrap. On first account-store access, the application hashes the password and creates a staff administrator in `data/users.json`; that ID is authorized to use Staff Management. Remove the bootstrap credentials after the deployment has durable account storage and verify an administrator can log in first. Login IDs are matched case-insensitively, while the original saved ID is retained.
+
+The current account database is a local JSON file. On hosting platforms with ephemeral filesystems, the bootstrap account can be recreated from secrets after a restart, but separately created accounts may not persist. Configure a durable database before relying on long-lived account records.
 
 ---
 

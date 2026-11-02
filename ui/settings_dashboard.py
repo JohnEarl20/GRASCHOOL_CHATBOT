@@ -82,8 +82,8 @@ def render_advanced_settings(
 
     # --------------------------------------------------------------------------
     # 2. HORIZONTAL CATEGORY NAVIGATION BAR
-    # Staff see all 10 categories; regular users/students see:
-    # Overview, AI Assistant, Security, Notifications, System
+    # Staff can open the User Management section, while its content remains admin-only.
+    # Regular users/students see Overview, AI Assistant, Security, Notifications, System.
     # --------------------------------------------------------------------------
     if is_staff_user:
         categories = [
@@ -91,13 +91,13 @@ def render_advanced_settings(
             ("general", "General", "sliders"),
             ("ai", "AI Assistant", "brain"),
             ("security", "Security", "shield"),
-            ("users", "Users", "users"),
             ("notifications", "Notifications", "bell"),
             ("database", "Database", "database"),
             ("system", "System", "activity"),
             ("school", "School", "school"),
             ("logs", "Logs", "file-text"),
         ]
+        categories.insert(5, ("users", "Users", "users"))
     else:
         categories = [
             ("overview", "Overview", "home"),
@@ -327,7 +327,6 @@ def render_advanced_settings(
                     ("general", "General Settings", "App preferences, language, time zone, and basic configuration.", "sliders"),
                     ("ai", "AI Assistant Configuration", "Customize AI behaviour, responses, language, and model settings.", "brain"),
                     ("security", "Security & Privacy", "Password, 2FA, sessions, login history, and account protection.", "shield"),
-                    ("users", "User Management", "Manage student and staff accounts, roles, and permissions.", "users"),
                     ("notifications", "Notifications & Alerts", "System notifications, announcements, reminders, and alerts.", "bell"),
                     ("database", "Database & Backup", "Backup, restore, export data, and manage database health.", "database"),
                     ("system", "System Monitoring", "Server status, API health, performance, and error logs.", "activity"),
@@ -335,6 +334,15 @@ def render_advanced_settings(
                     ("accessibility", "Accessibility", "Font size, contrast, animations, and accessibility features.", "accessibility"),
                     ("logs", "Audit Logs", "Track and review all important system changes and activities.", "file-text"),
                 ]
+                overview_items.insert(
+                    3,
+                    (
+                        "users",
+                        "User Management",
+                        "Manage student and staff accounts, roles, and permissions.",
+                        "users",
+                    )
+                )
             else:
                 overview_items = [
                     ("ai", "AI Assistant Configuration", "Customize AI behaviour, responses, language, and model settings.", "brain"),
@@ -580,10 +588,17 @@ def render_advanced_settings(
         # TAB 5: USER MANAGEMENT
         # ----------------------------------------------------------------------
         elif active_tab == "users":
+            if not auth.is_admin():
+                st.error("User Management is restricted to authorized administrators.")
+                return
             st.markdown("### 👥 User Management")
-            st.caption("View registered student & staff accounts, assign roles, or register new users.")
+            st.caption("View registered student and staff account records.")
 
-            users_data = auth._load_users()
+            try:
+                users_data = auth._load_users()
+            except auth.AccountStoreError as error:
+                st.error(f"Could not load accounts: {error}")
+                return
 
             st.markdown('<div class="cca-futuristic-card">', unsafe_allow_html=True)
             st.markdown(f"**Total Registered Accounts:** `{len(users_data)}`")
@@ -603,29 +618,10 @@ def render_advanced_settings(
                 st.dataframe(pd.DataFrame(user_rows), use_container_width=True)
 
             st.divider()
-            if is_staff_user:
-                st.markdown("##### Create / Register New User")
-                c_u1, c_u2 = st.columns(2)
-                with c_u1:
-                    new_uid = st.text_input("Username / ID", key="admin_add_uid")
-                    new_name = st.text_input("Full Name", key="admin_add_name")
-                with c_u2:
-                    new_role = st.selectbox("Role", options=["student", "staff"], key="admin_add_role")
-                    new_pw_admin = st.text_input("Temporary Password", type="password", key="admin_add_pw")
-
-                if st.button("Add User Account", key="admin_add_user_btn", type="primary"):
-                    if not new_uid or not new_pw_admin:
-                        st.error("Username and password are required.")
-                    else:
-                        ok, msg = auth.create_account(new_uid, new_pw_admin, name=new_name, role=new_role)
-                        if ok:
-                            log_audit_fn(f"Admin registered new account '{new_uid}' ({new_role})", current_user_name)
-                            st.success(f"✅ User '{new_uid}' added successfully!")
-                            st.rerun()
-                        else:
-                            st.error(msg)
-            else:
-                st.info("ℹ️ Account provisioning is restricted to staff administrators.")
+            st.info(
+                "Use the Staff Management page to create staff accounts. "
+                "Public account registration is limited to students."
+            )
 
             st.markdown("</div>", unsafe_allow_html=True)
 
@@ -852,4 +848,3 @@ def render_advanced_settings(
                 log_audit_fn("Updated accessibility preferences", current_user_name)
                 st.toast("✅ Accessibility settings saved!", icon="♿")
                 st.rerun()
-

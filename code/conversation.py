@@ -17,6 +17,7 @@ from code import staff_presence
 
 ROOT = Path(__file__).resolve().parent.parent
 CONV_DIR = ROOT / "data" / "conversations"
+STAFF_RESPONSE_TIMEOUT_SECONDS = 5
 
 
 def _ensure_dir() -> None:
@@ -223,6 +224,8 @@ def add_message(session_id: str, role: str, text: str, sender_id: str | None = N
             or sender_id != current_user_id
         ):
             raise PermissionError("Only the authenticated staff member can reply as staff.")
+        if conv.get("assigned_staff") != current_user_id:
+            raise PermissionError("Take over this inquiry before replying to the student.")
     elif role in {"student", "assistant"}:
         if (
             not auth.is_student()
@@ -246,9 +249,15 @@ def add_message(session_id: str, role: str, text: str, sender_id: str | None = N
     conv["messages"].append(msg)
     conv["updated_at"] = now
 
-    if role == "staff":
+    if role == "student" and (
+        conv.get("status") == "waiting" or conv.get("assigned_staff")
+    ):
+        conv["status"] = "waiting"
+        conv["waiting_since"] = now
+    elif role == "staff":
         conv["status"] = "active"
         conv["assigned_staff"] = sender_id
+        conv.pop("waiting_since", None)
 
     _save_conversation(conv)
     return msg
@@ -282,9 +291,74 @@ def update_conversation_status(session_id: str, status: str, staff_id: str | Non
     conv["status"] = status
     if staff_id:
         conv["assigned_staff"] = staff_id
-    conv["updated_at"] = datetime.now().isoformat(timespec="microseconds")
+    now = datetime.now().isoformat(timespec="microseconds")
+    if status == "waiting":
+        conv["waiting_since"] = now
+    elif status == "closed":
+        conv.pop("waiting_since", None)
+    conv["updated_at"] = now
     _save_conversation(conv)
     return conv
+
+
+def staff_response_seconds_remaining(conv: dict) -> int | None:
+    """Return seconds until AI fallback, or None when no staff reply is pending."""
+    waiting_since = conv.get("waiting_since")
+    if not isinstance(waiting_since, str) or not waiting_since:
+        return None
+    try:
+        started = datetime.fromisoformat(waiting_since)
+    except ValueError:
+        return None
+    now = datetime.now(started.tzinfo) if started.tzinfo else datetime.now()
+    elapsed = (now - started).total_seconds()
+    return max(0, int(STAFF_RESPONSE_TIMEOUT_SECONDS - elapsed))
+
+
+def add_staff_timeout_reply(
+    session_id: str,
+    expected_waiting_since: str,
+    text: str,
+    meta: dict | None = None,
+) -> dict | None:
+    """Atomically let AI answer after the staff response deadline expires."""
+    from code import auth
+
+    conv = _load_conversation(session_id)
+    current_user_id = auth.get_current_user_id()
+    if (
+        not auth.is_student()
+        or not current_user_id
+        or not conv
+        or conv.get("student_id") != current_user_id
+    ):
+        raise PermissionError("Only the student who owns this conversation can trigger AI fallback.")
+    if (
+        conv.get("status") == "closed"
+        or conv.get("waiting_since") != expected_waiting_since
+        or staff_response_seconds_remaining(conv) != 0
+    ):
+        return None
+
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("AI response cannot be empty.")
+
+    now = _next_message_timestamp(conv)
+    message = {
+        "id": uuid.uuid4().hex[:8],
+        "role": "assistant",
+        "text": text.strip(),
+        "sender_id": None,
+        "sender_name": None,
+        "timestamp": now,
+        "meta": meta or {},
+    }
+    conv["messages"].append(message)
+    conv["status"] = "active"
+    conv.pop("waiting_since", None)
+    conv["updated_at"] = now
+    _save_conversation(conv)
+    return message
 
 
 def get_waiting_conversations() -> list[dict]:
@@ -366,6 +440,13 @@ def assign_staff_to_conversation(session_id: str, staff_id: str, staff_name: str
         raise PermissionError("Only an authenticated staff member can assign themselves.")
     conv = get_conversation(session_id)
     if not conv or conv.get("status") == "closed":
+        return None
+    current_assignment = conv.get("assigned_staff")
+    if (
+        current_assignment
+        and current_assignment != staff_id
+        and staff_presence.is_staff_online(current_assignment)
+    ):
         return None
     conv["assigned_staff"] = staff_id
     conv["status"] = "active"

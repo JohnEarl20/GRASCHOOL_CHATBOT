@@ -8,6 +8,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from code import auth
+
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
 ARTICLES_PATH = DATA_DIR / "knowledge_articles.json"
@@ -15,7 +17,7 @@ ANNOUNCEMENTS_PATH = DATA_DIR / "staff_announcements.json"
 DOCUMENTS_PATH = DATA_DIR / "staff_documents.json"
 DOCUMENT_DIR = DATA_DIR / "staff_documents"
 ALLOWED_DOCUMENT_TYPES = {".csv", ".docx", ".pdf", ".txt", ".xlsx"}
-MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
+MAX_DOCUMENT_BYTES = 500 * 1024 * 1024
 ARTICLE_CATEGORIES = (
     "Enrollment",
     "Tuition and Fees",
@@ -154,18 +156,58 @@ def load_documents() -> list[dict[str, Any]]:
     return _read_records(DOCUMENTS_PATH)
 
 
+def _normalize_student_ids(student_ids: list[str] | None) -> list[str]:
+    if student_ids is None:
+        return []
+    if not isinstance(student_ids, list) or any(
+        not isinstance(student_id, str)
+        or not student_id.strip()
+        or len(student_id.strip()) > 64
+        for student_id in student_ids
+    ):
+        raise ValueError("Choose valid student accounts to share this document with.")
+    return list(dict.fromkeys(student_id.strip() for student_id in student_ids))
+
+
+def documents_for_student(student_id: str) -> list[dict[str, Any]]:
+    if not isinstance(student_id, str) or not student_id.strip():
+        return []
+    normalized_id = student_id.strip().casefold()
+    visible = []
+    for row in load_documents():
+        shared_with = row.get("shared_with", [])
+        if isinstance(shared_with, list) and any(
+            isinstance(shared_id, str)
+            and shared_id.strip().casefold() == normalized_id
+            for shared_id in shared_with
+        ):
+            visible.append(row)
+    return visible
+
+
+def _validate_document_content(content: bytes) -> None:
+    if not content:
+        raise ValueError("The selected document is empty. Choose a file containing data.")
+    if len(content) > MAX_DOCUMENT_BYTES:
+        size_mb = len(content) / (1024 * 1024)
+        limit_mb = MAX_DOCUMENT_BYTES // (1024 * 1024)
+        raise ValueError(
+            f"Document is {size_mb:.1f} MB; the maximum allowed size is {limit_mb} MB."
+        )
+
+
 def save_document(
     filename: str,
     content: bytes,
     category: str,
     staff_id: str,
+    shared_with: list[str] | None = None,
 ) -> dict[str, Any]:
     original_name = Path(filename).name
     extension = Path(original_name).suffix.lower()
     if extension not in ALLOWED_DOCUMENT_TYPES:
         raise ValueError("Unsupported file type. Upload PDF, DOCX, TXT, CSV, or XLSX.")
-    if not content or len(content) > MAX_DOCUMENT_BYTES:
-        raise ValueError("Document must be non-empty and no larger than 20 MB.")
+    _validate_document_content(content)
     category = category.strip()
     if not category or len(category) > 80:
         raise ValueError("Document category is required and must be 80 characters or fewer.")
@@ -182,6 +224,7 @@ def save_document(
         "size": len(content),
         "uploaded_by": staff_id,
         "uploaded_at": datetime.now().isoformat(timespec="seconds"),
+        "shared_with": _normalize_student_ids(shared_with),
     }
     records = load_documents()
     records.append(record)
@@ -195,6 +238,7 @@ def replace_document(
     content: bytes,
     category: str,
     staff_id: str,
+    shared_with: list[str] | None = None,
 ) -> dict[str, Any]:
     if not re.fullmatch(r"[a-f0-9]{32}", document_id):
         raise ValueError("Invalid document reference.")
@@ -202,8 +246,7 @@ def replace_document(
     extension = Path(original_name).suffix.lower()
     if extension not in ALLOWED_DOCUMENT_TYPES:
         raise ValueError("Unsupported file type. Upload PDF, DOCX, TXT, CSV, or XLSX.")
-    if not content or len(content) > MAX_DOCUMENT_BYTES:
-        raise ValueError("Document must be non-empty and no larger than 20 MB.")
+    _validate_document_content(content)
     category = category.strip()
     if not category or len(category) > 80:
         raise ValueError("Document category is required and must be 80 characters or fewer.")
@@ -226,6 +269,8 @@ def replace_document(
         uploaded_by=staff_id,
         uploaded_at=datetime.now().isoformat(timespec="seconds"),
     )
+    if shared_with is not None:
+        record["shared_with"] = _normalize_student_ids(shared_with)
     _write_records(DOCUMENTS_PATH, records)
     old_path = DOCUMENT_DIR / old_name
     if old_path.is_file():
@@ -246,3 +291,83 @@ def read_document(document_id: str) -> tuple[dict[str, Any], bytes]:
     if not path.is_file():
         raise FileNotFoundError(f"Stored document is missing: {record.get('filename', document_id)}")
     return record, path.read_bytes()
+
+
+def read_document_for_student(
+    document_id: str,
+    student_id: str,
+) -> tuple[dict[str, Any], bytes]:
+    current_student_id = auth.get_current_user_id()
+    if (
+        not auth.is_student()
+        or not isinstance(student_id, str)
+        or not student_id.strip()
+        or not isinstance(current_student_id, str)
+        or current_student_id.strip().casefold() != student_id.strip().casefold()
+    ):
+        raise PermissionError("A student account is required to access shared documents.")
+    allowed_ids = {
+        row.get("id")
+        for row in documents_for_student(student_id)
+    }
+    if document_id not in allowed_ids:
+        raise PermissionError("This document has not been shared with your account.")
+    return read_document(document_id)
+
+
+def remove_shared_document_for_student(document_id: str, student_id: str) -> bool:
+    current_student_id = auth.get_current_user_id()
+    if (
+        not auth.is_student()
+        or not isinstance(student_id, str)
+        or not student_id.strip()
+        or not isinstance(current_student_id, str)
+        or current_student_id.strip().casefold() != student_id.strip().casefold()
+    ):
+        raise PermissionError("Students can only remove documents shared with their own account.")
+    if not re.fullmatch(r"[a-f0-9]{32}", document_id):
+        raise ValueError("Invalid document reference.")
+
+    records = load_documents()
+    record = next((row for row in records if row.get("id") == document_id), None)
+    if record is None:
+        return False
+    shared_with = record.get("shared_with", [])
+    if not isinstance(shared_with, list):
+        raise ValueError("Invalid document sharing record.")
+    normalized_id = student_id.strip().casefold()
+    updated_shared_with = [
+        shared_id
+        for shared_id in shared_with
+        if not isinstance(shared_id, str)
+        or shared_id.strip().casefold() != normalized_id
+    ]
+    if len(updated_shared_with) == len(shared_with):
+        return False
+    record["shared_with"] = updated_shared_with
+    _write_records(DOCUMENTS_PATH, records)
+    return True
+
+
+def delete_document(document_id: str) -> bool:
+    if not auth.is_staff():
+        raise PermissionError("Only staff accounts can delete managed documents.")
+    if not re.fullmatch(r"[a-f0-9]{32}", document_id):
+        raise ValueError("Invalid document reference.")
+
+    records = load_documents()
+    record = next((row for row in records if row.get("id") == document_id), None)
+    if record is None:
+        return False
+    stored_name = record.get("stored_name", "")
+    if not re.fullmatch(r"[a-f0-9]{32}\.(csv|docx|pdf|txt|xlsx)", stored_name):
+        raise ValueError("Invalid document storage reference.")
+
+    _write_records(
+        DOCUMENTS_PATH,
+        [row for row in records if row.get("id") != document_id],
+    )
+    stored_path = DOCUMENT_DIR / stored_name
+    if stored_path.is_file():
+        stored_path.unlink()
+    return True

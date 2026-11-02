@@ -11,6 +11,7 @@ data/staff_announcements.json
 data/staff_documents.json
 data/staff_documents/
 data/staff_reports/
+data/users.json
 
 # --- editor / agent workspace artifacts ----------------------------------
 # These are Code Janitor's own memory files. They are not imported by any

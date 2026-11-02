@@ -28,7 +28,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from code import dialogue, forecast, knowledge, logger, conversation, staff_content, staff_presence
+from code import dialogue, forecast, knowledge, logger, conversation, handoff, staff_content, staff_presence
 from code import intent_model as intent_model_module
 from code import staff_gate, auth
 from ui import components as C
@@ -59,6 +59,9 @@ INTENT_LABELS = {
 
 NAV = [
     ("chat", "AI Assistant", "bot"),
+    ("student_announcements", "School Announcements", "megaphone"),
+    ("student_documents", "Shared Documents", "upload"),
+    ("student_knowledge", "Knowledge Base", "book"),
 ]
 
 # Auth views (shown in sidebar based on login state)
@@ -83,13 +86,12 @@ ALL_VIEWS = (
 
 STAFF_NAV = [
     ("dashboard", "Staff Dashboard", "home"),
-    ("chat", "Staff AI Assistant", "bot"),
     ("inquiries", "Student Inquiries", "message"),
-    ("knowledge", "Knowledge Base", "book"),
+    ("knowledge_announcements", "Knowledge & Announcements", "book"),
     ("review", "Question Review", "file-text"),
     ("documents", "Document Management", "upload"),
-    ("announcements", "School Announcements", "megaphone"),
     ("analytics", "Analytics & Reports", "chart"),
+    ("staff_management", "Staff Management", "users"),
     ("settings", "Settings", "settings"),
 ]
 
@@ -200,6 +202,12 @@ def init_state() -> None:
     if requested in ALL_VIEWS:
         st.session_state.view = requested
     requested_section = st.query_params.get("section")
+    if requested_section in {"knowledge", "announcements"}:
+        st.session_state["staff_knowledge_announcements_tab"] = (
+            "Knowledge Base" if requested_section == "knowledge"
+            else "School Announcements"
+        )
+        requested_section = "knowledge_announcements"
     valid_sections = {key for key, _, _ in STAFF_NAV if key not in {"chat", "settings"}}
     if st.session_state["staff_section"] not in valid_sections:
         st.session_state["staff_section"] = "dashboard"
@@ -234,6 +242,94 @@ def profile() -> dict | None:
 # --------------------------------------------------------------------------
 # Sidebar
 # --------------------------------------------------------------------------
+def _render_student_shared_documents(student_id: str) -> None:
+    st.markdown("## Shared Documents")
+    st.caption("Documents shared with your account by school staff.")
+    try:
+        documents = staff_content.documents_for_student(student_id)
+    except (OSError, ValueError) as error:
+        st.error(f"Could not load shared documents: {error}")
+        return
+
+    if not documents:
+        st.info("Documents shared with you will appear here.")
+        return
+    mime_types = {
+        ".csv": "text/csv",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".pdf": "application/pdf",
+        ".txt": "text/plain",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }
+    for document in documents:
+        try:
+            record, content = staff_content.read_document_for_student(
+                str(document.get("id", "")),
+                student_id,
+            )
+        except PermissionError:
+            st.warning("A document is no longer shared with your account.")
+            continue
+        except (OSError, ValueError) as error:
+            st.error(f"Could not open a shared document: {error}")
+            continue
+        document_id = str(record.get("id", ""))
+        download_col, remove_col = st.columns([4, 1], gap="small")
+        with download_col:
+            st.download_button(
+                f"Download · {record.get('filename', 'Document')}",
+                data=content,
+                file_name=record.get("filename", "document"),
+                mime=mime_types.get(Path(record.get("filename", "")).suffix.lower(), "application/octet-stream"),
+                key=f"student_shared_document_{document_id}",
+                width="stretch",
+            )
+        with remove_col:
+            if st.button(
+                "🗑",
+                key=f"student_remove_shared_document_{document_id}",
+                help="Remove this document from your shared documents",
+            ):
+                st.session_state[f"confirm_remove_shared_document_{document_id}"] = True
+                st.rerun()
+        st.caption(f"{record.get('category', 'School document')} · {record.get('uploaded_at', '')[:10]}")
+        confirmation_key = f"confirm_remove_shared_document_{document_id}"
+        if st.session_state.get(confirmation_key):
+            st.warning(
+                f"Remove **{record.get('filename', 'this document')}** from your shared documents? "
+                "You will lose access, but it will remain available to other students."
+            )
+            confirm_col, cancel_col = st.columns(2, gap="small")
+            with confirm_col:
+                if st.button(
+                    "Remove access",
+                    key=f"confirm_remove_shared_document_yes_{document_id}",
+                    type="primary",
+                    width="stretch",
+                ):
+                    try:
+                        removed = staff_content.remove_shared_document_for_student(
+                            document_id,
+                            student_id,
+                        )
+                    except (OSError, PermissionError, ValueError) as error:
+                        st.error(f"Could not remove the shared document: {error}")
+                    else:
+                        if removed:
+                            st.session_state.pop(confirmation_key, None)
+                            st.rerun()
+                        else:
+                            st.error("This document is no longer shared with your account.")
+            with cancel_col:
+                if st.button(
+                    "Cancel",
+                    key=f"confirm_remove_shared_document_no_{document_id}",
+                    width="stretch",
+                ):
+                    st.session_state.pop(confirmation_key, None)
+                    st.rerun()
+
+
 def render_sidebar() -> None:
     session: dialogue.Session = st.session_state.session
     unlocked = staff_gate.is_unlocked()
@@ -284,6 +380,8 @@ def render_sidebar() -> None:
                 if row.get("event") != "feedback" and not row.get("answered")
             )
             for key, label, icon_name in STAFF_NAV:
+                if key == "staff_management" and not auth.is_admin():
+                    continue
                 badge_count = waiting_count if key == "inquiries" else unanswered_count if key == "review" else 0
                 active = (
                     st.session_state.view == "settings" if key == "settings"
@@ -582,29 +680,45 @@ def _open_student_conversation(student_id: str, conversation_id: str) -> bool:
 
 
 def _request_staff_response(conversation_id: str) -> None:
-    """Move the student's unanswered question to the staff queue."""
     try:
-        updated = conversation.update_conversation_status(conversation_id, "waiting")
-        if updated is None:
-            st.error("This conversation is no longer available.")
-            return
-        notice = conversation.add_message(
-            conversation_id,
-            "assistant",
-            "Your request has been sent to the staff queue. A staff member can reply here.",
-            meta={
-                "intent": "staff_requested",
-                "source": "student-requested staff support",
-            },
-        )
+        updated, notice = handoff.request_staff_response(conversation_id)
     except (OSError, PermissionError, ValueError) as error:
         st.error(f"Could not request a staff response: {error}")
         return
-    if notice is None:
-        st.error("The request was queued, but its confirmation could not be saved.")
-        return
     st.session_state.messages = updated.get("messages", []) + [notice]
     st.rerun()
+
+
+@st.fragment(run_every=5)
+def _poll_staff_response_timeout(conversation_id: str, student_id: str) -> None:
+    conv = conversation.get_conversation(conversation_id)
+    if not conv or conv.get("student_id") != student_id:
+        return
+    waiting_since = conv.get("waiting_since")
+    if not isinstance(waiting_since, str):
+        return
+    remaining = conversation.staff_response_seconds_remaining(conv)
+    if remaining is None:
+        return
+    if remaining > 0:
+        minutes, seconds = divmod(remaining, 60)
+        st.caption(
+            f"Waiting for staff · GRA AI will answer in {minutes}:{seconds:02d} "
+            "if no staff member replies."
+        )
+        return
+
+    try:
+        saved = handoff.generate_timeout_fallback(
+            conversation_id,
+            student_id,
+            current_policy(),
+        )
+    except (OSError, PermissionError, ValueError, RuntimeError) as error:
+        st.error(f"GRA AI could not take over the unanswered request: {error}")
+        return
+    if saved is not None:
+        st.rerun()
 
 
 def render_chat() -> None:
@@ -674,7 +788,17 @@ def render_chat() -> None:
         current_conversation = conversation.get_conversation(st.session_state.conversation_id)
         if current_conversation and current_conversation.get("student_id") == student_id:
             status = current_conversation.get("status", "active")
-            if status == "waiting":
+            waiting_for_staff_reply = bool(current_conversation.get("waiting_since"))
+            if waiting_for_staff_reply:
+                _poll_staff_response_timeout(
+                    current_conversation["session_id"],
+                    student_id,
+                )
+                st.info(
+                    "🕐 **Waiting for staff response.** GRA AI will answer automatically "
+                    "after 5 seconds if no staff member replies."
+                )
+            elif status == "waiting":
                 st.info("🕐 **Waiting for staff response...** Your message is in the staff queue.")
             elif (
                 status == "active"
@@ -1097,6 +1221,18 @@ def topic_chart(intents: dict):
 
 def render_dashboard() -> None:
     section = str(st.session_state.get("staff_section", "dashboard"))
+    if section == "staff_management":
+        staff_workspace.render_staff_management(_log_audit)
+        return
+    if section == "inquiries":
+        inquiries_tab, assistant_tab = st.tabs(
+            ["Student Inquiries", "Staff AI Assistant"]
+        )
+        with inquiries_tab:
+            _render_staff_chat()
+        with assistant_tab:
+            render_chat()
+        return
     staff_workspace.render(section, _log_audit, _render_staff_chat)
 
 
@@ -1219,7 +1355,9 @@ def _render_staff_chat() -> None:
                     st.rerun()
 
         with col3:
-            if not assigned_staff or not staff_online:
+            if assigned_staff == staff_id:
+                st.success("You are handling this inquiry.")
+            elif not assigned_staff or not staff_online:
                 if st.button("Take Over", key=f"takeover_{selected_session_id}", type="primary", width="stretch"):
                     try:
                         assigned = conversation.assign_staff_to_conversation(
@@ -1232,7 +1370,10 @@ def _render_staff_chat() -> None:
                             _log_audit("Assigned a student inquiry", staff_name)
                             st.rerun()
                         else:
-                            st.error("This inquiry is no longer available or has been resolved.")
+                            st.error(
+                                "This inquiry is no longer available, has been resolved, "
+                                "or is being handled by another online staff member."
+                            )
 
             if st.session_state.get(f"confirm_close_{selected_session_id}", False):
                 col_a, col_b = st.columns(2)
@@ -1257,9 +1398,6 @@ def _render_staff_chat() -> None:
                         st.rerun()
             elif st.button("Resolve inquiry", key=f"close_{selected_session_id}", type="secondary", width="stretch"):
                 st.session_state[f"confirm_close_{selected_session_id}"] = True
-                st.rerun()
-
-            if st.button("Refresh", key=f"refresh_{selected_session_id}"):
                 st.rerun()
 
     if st.session_state.get(f"confirm_delete_{selected_session_id}", False):
@@ -1349,46 +1487,57 @@ def _render_staff_chat() -> None:
 
     # Staff reply input
     if summary["status"] != "closed":
-        st.markdown("##### Reply as Staff")
-        pending_template = st.session_state.pop(f"staff_reply_template_{selected_session_id}", None)
-        if pending_template:
-            st.session_state[f"staff_reply_{selected_session_id}"] = pending_template
-        reply_text = st.text_area("Your response", key=f"staff_reply_{selected_session_id}", height=100)
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            if st.button("Send reply", key=f"send_{selected_session_id}", type="primary", width="stretch"):
-                if reply_text.strip():
-                    try:
-                        message = conversation.add_message(
-                            selected_session_id,
-                            "staff",
-                            reply_text.strip(),
-                            sender_id=staff_id,
-                            sender_name=staff_name,
-                        )
-                    except (OSError, PermissionError, ValueError) as error:
-                        st.error(f"Could not send your reply: {error}")
-                    else:
-                        if message is None:
-                            st.error("This inquiry is no longer available.")
-                        else:
-                            _log_audit("Replied to a student inquiry", staff_name)
-                            st.rerun()
-                else:
-                    st.warning("Please enter a message")
-        with col2:
-            quick_replies = [
-                "Hello! I'm a registrar staff member. How can I help you?",
-                "I've checked your records and here's what I found...",
-                "Please visit the Registrar's Office at Main Building Room 101 during office hours.",
-                "Your request has been processed. You'll receive a confirmation email shortly.",
-                "Let me transfer you to the appropriate department.",
-            ]
-            selected_template = st.selectbox("Quick reply", [""] + quick_replies, key=f"quick_{selected_session_id}")
-            if selected_template and st.button("Use Template", key=f"use_template_{selected_session_id}"):
-                st.session_state[f"staff_reply_template_{selected_session_id}"] = selected_template
+        if assigned_staff != staff_id:
+            st.info("Click **Take Over** before replying to this student.")
+        else:
+            reply_heading, refresh_col = st.columns([5, 1], vertical_alignment="center")
+            reply_heading.markdown("##### Reply as Staff")
+            if refresh_col.button(
+                "Refresh",
+                key=f"refresh_{selected_session_id}",
+                icon=":material/refresh:",
+                width="stretch",
+                help="Check for new messages from the student.",
+            ):
                 st.rerun()
-        st.caption("Refresh to check for new messages from the student.")
+            pending_template = st.session_state.pop(f"staff_reply_template_{selected_session_id}", None)
+            if pending_template:
+                st.session_state[f"staff_reply_{selected_session_id}"] = pending_template
+            reply_text = st.text_area("Your response", key=f"staff_reply_{selected_session_id}", height=100)
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                if st.button("Send reply", key=f"send_{selected_session_id}", type="primary", width="stretch"):
+                    if reply_text.strip():
+                        try:
+                            message = conversation.add_message(
+                                selected_session_id,
+                                "staff",
+                                reply_text.strip(),
+                                sender_id=staff_id,
+                                sender_name=staff_name,
+                            )
+                        except (OSError, PermissionError, ValueError) as error:
+                            st.error(f"Could not send your reply: {error}")
+                        else:
+                            if message is None:
+                                st.error("This inquiry is no longer available.")
+                            else:
+                                _log_audit("Replied to a student inquiry", staff_name)
+                                st.rerun()
+                    else:
+                        st.warning("Please enter a message")
+            with col2:
+                quick_replies = [
+                    "Hello! I'm a registrar staff member. How can I help you?",
+                    "I've checked your records and here's what I found...",
+                    "Please visit the Registrar's Office at Main Building Room 101 during office hours.",
+                    "Your request has been processed. You'll receive a confirmation email shortly.",
+                    "Let me transfer you to the appropriate department.",
+                ]
+                selected_template = st.selectbox("Quick reply", [""] + quick_replies, key=f"quick_{selected_session_id}")
+                if selected_template and st.button("Use Template", key=f"use_template_{selected_session_id}"):
+                    st.session_state[f"staff_reply_template_{selected_session_id}"] = selected_template
+                    st.rerun()
 
 
 def _unanswered_table_html(rows: list[dict]) -> str:
@@ -1671,6 +1820,76 @@ def render_settings() -> None:
     )
 
 
+def render_student_announcements() -> None:
+    if not auth.is_student():
+        st.error("This page is available to student accounts only.")
+        return
+    st.markdown("## School Announcements")
+    today = datetime.now().date().isoformat()
+    try:
+        announcements = [
+            item
+            for item in staff_content.load_announcements()
+            if item.get("status") in {"published", "scheduled"}
+            and str(item.get("publish_on", "")) <= today
+        ]
+    except (OSError, ValueError) as error:
+        st.error(f"Could not load school announcements: {error}")
+        return
+    announcements.sort(
+        key=lambda item: str(item.get("publish_on", "")),
+        reverse=True,
+    )
+    if not announcements:
+        st.info("There are no current school announcements.")
+        return
+    for item in announcements:
+        with st.container(border=True):
+            st.markdown(f"### {item.get('title', 'School announcement')}")
+            st.write(item.get("body", ""))
+            if item.get("publish_on"):
+                st.caption(f"Published {item['publish_on']}")
+
+
+def render_student_knowledge() -> None:
+    if not auth.is_student():
+        st.error("This page is available to student accounts only.")
+        return
+    st.markdown("## Knowledge Base")
+    st.caption("Official school information approved for student access.")
+    try:
+        articles = [
+            article
+            for article in staff_content.load_articles()
+            if article.get("status") == "approved"
+        ]
+    except (OSError, ValueError) as error:
+        st.error(f"Could not load the school knowledge base: {error}")
+        return
+    articles.sort(key=lambda article: str(article.get("category", "")).casefold())
+    if not articles:
+        st.info("There are no approved knowledge articles yet.")
+        return
+    for article in articles:
+        with st.container(border=True):
+            st.markdown(f"### {article.get('title', 'School information')}")
+            st.caption(str(article.get("category", "School information")))
+            st.write(article.get("content", ""))
+            if article.get("source"):
+                st.caption(f"Verified school source: {article['source']}")
+
+
+def render_student_documents() -> None:
+    if not auth.is_student():
+        st.error("This page is available to student accounts only.")
+        return
+    student_id = auth.get_current_user_id()
+    if not student_id:
+        st.error("Could not identify your student account.")
+        return
+    _render_student_shared_documents(student_id)
+
+
 
 # --------------------------------------------------------------------------
 # Staff login page (separate from main navigation)
@@ -1794,8 +2013,13 @@ def render_login() -> None:
             success, message = auth.login(user_id, password, expected_role)
             if success:
                 st.success(message)
-                st.session_state.view = "chat"
-                st.query_params["view"] = "chat"
+                if expected_role == "staff":
+                    st.session_state.view = "dashboard"
+                    st.session_state["staff_section"] = "dashboard"
+                    st.query_params["view"] = "dashboard"
+                else:
+                    st.session_state.view = "chat"
+                    st.query_params["view"] = "chat"
                 st.rerun()
             else:
                 st.error(message)
@@ -1808,10 +2032,10 @@ def render_login() -> None:
 # Unified register page (student or staff)
 # --------------------------------------------------------------------------
 def render_register() -> None:
-    """Unified account creation page for students and staff."""
+    """Public student-only account registration."""
     C.hero(
         "Create Account",
-        "Register with your ID. Select your role: Student for chat access, Staff for dashboard access."
+        "Create a student account to access the GRA SCHOOL AI Assistant."
     )
 
     if auth.is_logged_in():
@@ -1820,15 +2044,10 @@ def render_register() -> None:
         st.query_params["view"] = "chat"
         st.rerun()
 
-    role = "Student"
-    if auth.is_staff():
-        role = st.radio("Register as", ["Student", "Staff"], horizontal=True, key="register_role")
-    else:
-        st.info("Student accounts can be self-registered. Staff accounts must be created by an authorized staff member.")
-    role_value = "student" if role == "Student" else "staff"
+    st.info("Student accounts can self-register. Staff accounts are created by authorized administrators only.")
 
     with st.form("register_form", clear_on_submit=False):
-        user_id = st.text_input(f"{role} ID", key="register_id")
+        user_id = st.text_input("Student ID", key="register_id")
         name = st.text_input("Name (optional)", key="register_name")
         password = st.text_input("Password", type="password", key="register_password")
         confirm = st.text_input("Confirm Password", type="password", key="register_confirm")
@@ -1836,17 +2055,17 @@ def render_register() -> None:
 
     if submitted:
         if not user_id or not password:
-            st.error(f"Please enter {role} ID and password")
+            st.error("Please enter Student ID and password.")
         elif password != confirm:
             st.error("Passwords do not match")
         elif len(password) < 4:
             st.error("Password must be at least 4 characters")
         else:
-            success, message = auth.create_account(user_id, password, name, role_value)
+            success, message = auth.create_account(user_id, password, name)
             if success:
                 st.success(message)
                 # Auto-login after registration
-                auth.login(user_id, password, role_value)
+                auth.login(user_id, password, "student")
                 st.session_state.view = "chat"
                 st.query_params["view"] = "chat"
                 st.rerun()
@@ -1894,10 +2113,20 @@ def main() -> None:
         st.query_params["view"] = "login"
         view = "login"
 
-    render_sidebar()
+    try:
+        render_sidebar()
+    except auth.AccountStoreError as error:
+        st.error(f"The account database is unavailable: {error}")
+        return
 
     if view == "chat":
         render_chat()
+    elif view == "student_announcements":
+        render_student_announcements()
+    elif view == "student_documents":
+        render_student_documents()
+    elif view == "student_knowledge":
+        render_student_knowledge()
     elif view == "voice":
         render_voice()
     elif view == "login":

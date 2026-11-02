@@ -44,6 +44,97 @@ def _require_staff() -> bool:
     return False
 
 
+def render_staff_management(audit_fn: Callable[[str, str], None]) -> None:
+    """Create and review staff accounts for explicitly configured admins."""
+    if not auth.is_admin():
+        st.error("Staff Management is restricted to authorized administrators.")
+        return
+
+    st.markdown("## Staff Management")
+    st.caption(
+        "Create individual staff accounts. New staff can sign in immediately "
+        "using their Staff ID and password."
+    )
+    notice = st.session_state.pop("staff_account_created_notice", None)
+    if notice:
+        st.success(notice)
+
+    with st.form("create_staff_account_form", clear_on_submit=True):
+        id_col, name_col = st.columns(2)
+        with id_col:
+            staff_id = st.text_input("Staff ID", max_chars=64)
+        with name_col:
+            full_name = st.text_input("Full Name", max_chars=120)
+
+        email_col, department_col = st.columns(2)
+        with email_col:
+            official_email = st.text_input("Official Email", max_chars=254)
+        with department_col:
+            department = st.text_input("Department", max_chars=100)
+
+        password_col, confirm_col = st.columns(2)
+        with password_col:
+            password = st.text_input(
+                "Password",
+                type="password",
+                help="Use at least 8 characters.",
+            )
+        with confirm_col:
+            confirm_password = st.text_input("Confirm Password", type="password")
+
+        submitted = st.form_submit_button(
+            "Create Staff Account",
+            type="primary",
+            icon=":material/person_add:",
+            width="stretch",
+        )
+
+    if submitted:
+        created, message = auth.create_staff_account(
+            staff_id,
+            full_name,
+            official_email,
+            department,
+            password,
+            confirm_password,
+        )
+        if created:
+            audit_fn(
+                f"Created staff account '{staff_id.strip()}'",
+                auth.get_current_user_name() or auth.get_current_user_id() or "admin",
+            )
+            st.session_state["staff_account_created_notice"] = message
+            st.rerun()
+        else:
+            st.error(message)
+
+    st.markdown("### Existing staff accounts")
+    try:
+        staff_rows = [
+            {
+                "Staff ID": user_id,
+                "Full Name": record.get("name", ""),
+                "Official Email": record.get("email", ""),
+                "Department": record.get("department", ""),
+                "Created": record.get("created_at", "")[:10],
+            }
+            for user_id, record in auth._load_users().items()
+            if record.get("role") == "staff"
+        ]
+    except auth.AccountStoreError as error:
+        st.error(f"Could not load staff accounts: {error}")
+        return
+
+    if staff_rows:
+        st.dataframe(
+            pd.DataFrame(staff_rows),
+            width="stretch",
+            hide_index=True,
+        )
+    else:
+        st.info("No staff accounts have been created yet.")
+
+
 def _questions() -> list[dict]:
     rows = [
         row for row in logger.read_logs()
@@ -639,9 +730,9 @@ def _render_quick_actions() -> None:
     st.markdown("<div class='cca-staff-section-heading'>Quick actions</div>", unsafe_allow_html=True)
     items = [
         ("Answer inquiry", "inquiries", "message"),
-        ("Add knowledge", "knowledge", "book"),
+        ("Add knowledge", "knowledge_announcements", "book"),
         ("Upload document", "documents", "upload"),
-        ("Create announcement", "announcements", "megaphone"),
+        ("Create announcement", "knowledge_announcements", "megaphone"),
         ("Generate report", "analytics", "chart"),
     ]
     with st.container(key="staff-quick-actions"):
@@ -651,8 +742,13 @@ def _render_quick_actions() -> None:
                 st.html(
                     f"<div class='cca-staff-action-icon'>{icon(glyph, 26, '#35D5FF')}</div>"
                 )
-                if st.button(f"{label}", key=f"staff_quick_{section}", width="stretch"):
+                if st.button(f"{label}", key=f"staff_quick_{section}_{glyph}", width="stretch"):
                     st.session_state["staff_section"] = section
+                    if section == "knowledge_announcements":
+                        st.session_state["staff_knowledge_announcements_tab"] = (
+                            "Knowledge Base" if label == "Add knowledge"
+                            else "School Announcements"
+                        )
                     st.query_params["section"] = section
                     st.rerun()
 
@@ -1294,15 +1390,39 @@ def render_analytics(audit_fn: Callable[[str, str], None]) -> None:
     )
 
 
-def render_question_review(audit_fn: Callable[[str, str], None]) -> None:
-    if not _require_staff():
-        return
-    st.markdown("## Question Review")
+@st.fragment(run_every=5)
+def _render_live_question_review(audit_fn: Callable[[str, str], None]) -> None:
     missed = forecast.unanswered(_questions())
     if not missed:
-        st.success("No unanswered questions are recorded.")
+        st.info("No unanswered questions are recorded. New student questions will appear automatically.")
+        st.caption(f"Last checked {datetime.now().astimezone().strftime('%H:%M:%S')} · updates every 5 seconds")
         return
     st.caption(f"{len(missed)} unanswered questions are available for staff review.")
+    st.caption(f"Live updates every 5 seconds · last checked {datetime.now().astimezone().strftime('%H:%M:%S')}")
+    review_rows = [
+        {
+            "Date": str(row.get("ts", "")).replace("T", " ")[:19] or "Unknown",
+            "Student": str(row.get("student_name") or "Student"),
+            "Student ID": str(row.get("student_id") or "Not recorded"),
+            "Question": str(row.get("text") or ""),
+            "Predicted topic": str(row.get("intent") or "Unknown"),
+            "Confidence": (
+                f"{float(row['confidence']):.0%}"
+                if isinstance(row.get("confidence"), (int, float))
+                else "Not available"
+            ),
+            "Escalated": "Yes" if row.get("escalated") else "No",
+            "Reference": str(row.get("session_id") or "Not available"),
+        }
+        for row in missed
+    ]
+    st.dataframe(
+        pd.DataFrame(review_rows),
+        width="stretch",
+        hide_index=True,
+        height=min(600, max(180, 38 + 35 * len(review_rows))),
+    )
+    st.markdown("### Classify a question")
     options = [
         f"{str(row.get('ts', ''))[:19]} · {str(row.get('text', ''))[:100]}"
         for row in missed
@@ -1330,6 +1450,13 @@ def render_question_review(audit_fn: Callable[[str, str], None]) -> None:
         else:
             audit_fn("Retrained intent model from the labelled corpus", auth.get_current_user_name() or auth.get_current_user_id() or "staff")
             st.success(f"Model retrained using {metrics.get('corpus_size', 'available')} labelled questions.")
+
+
+def render_question_review(audit_fn: Callable[[str, str], None]) -> None:
+    if not _require_staff():
+        return
+    st.markdown("## Question Review")
+    _render_live_question_review(audit_fn)
 
 
 def render_knowledge_base(audit_fn: Callable[[str, str], None]) -> None:
@@ -1405,7 +1532,20 @@ def render_documents(audit_fn: Callable[[str, str], None]) -> None:
     if not _require_staff():
         return
     st.markdown("## Document Management")
-    st.caption("Staff-only file storage. Supported uploads: PDF, DOCX, TXT, CSV, XLSX (20 MB maximum).")
+    st.caption(
+        "Upload documents and choose which student accounts can access them. "
+        "Unassigned documents remain staff-only. Supported: PDF, DOCX, TXT, CSV, XLSX (500 MB maximum)."
+    )
+    try:
+        users = auth._load_users()
+    except auth.AccountStoreError as error:
+        st.error(f"Could not load student accounts: {error}")
+        return
+    student_options = {
+        user_id: f"{record.get('name') or user_id} · {user_id}"
+        for user_id, record in users.items()
+        if record.get("role") == "student"
+    }
     documents = staff_content.load_documents()
     document_options = {"Upload as a new document": None}
     document_options.update({
@@ -1414,11 +1554,27 @@ def render_documents(audit_fn: Callable[[str, str], None]) -> None:
     })
     replacement_id = st.selectbox("Upload operation", list(document_options), key="staff_document_operation")
     replace_id = document_options[replacement_id]
+    current_document = next(
+        (row for row in documents if row.get("id") == replace_id),
+        {},
+    )
+    default_recipients = [
+        student_id
+        for student_id in current_document.get("shared_with", [])
+        if student_id in student_options
+    ]
     with st.form("staff_document_upload", clear_on_submit=True):
         upload = st.file_uploader("Choose a supporting document", type=["pdf", "docx", "txt", "csv", "xlsx"])
         category = st.text_input("Category", max_chars=80, placeholder="For example: Enrollment")
+        selected_students = st.multiselect(
+            "Share with student(s)",
+            options=list(student_options),
+            default=default_recipients,
+            format_func=lambda student_id: student_options[student_id],
+            help="Only selected students can download this document from their Student AI Assistant. Leave blank for staff-only access.",
+        )
         submitted = st.form_submit_button(
-            "Replace document" if replace_id else "Upload document",
+            "Replace document" if replace_id else "Upload and share document",
             type="primary",
         )
     if submitted:
@@ -1433,6 +1589,7 @@ def render_documents(audit_fn: Callable[[str, str], None]) -> None:
                         upload.getvalue(),
                         category,
                         auth.get_current_user_id() or "",
+                        selected_students,
                     )
                 else:
                     record = staff_content.save_document(
@@ -1440,13 +1597,18 @@ def render_documents(audit_fn: Callable[[str, str], None]) -> None:
                         upload.getvalue(),
                         category,
                         auth.get_current_user_id() or "",
+                        selected_students,
                     )
             except (OSError, ValueError) as error:
                 st.error(f"Document upload failed: {error}")
             else:
                 action = "Replaced" if replace_id else "Uploaded"
                 audit_fn(f"{action} staff document '{record['filename']}'", auth.get_current_user_name() or auth.get_current_user_id() or "staff")
-                st.success(f"Document {action.lower()} in the staff-only file area.")
+                recipient_count = len(record.get("shared_with", []))
+                st.success(
+                    f"Document {action.lower()}. "
+                    f"Shared with {recipient_count} student account(s)."
+                )
                 st.rerun()
 
     documents = staff_content.load_documents()
@@ -1459,7 +1621,12 @@ def render_documents(audit_fn: Callable[[str, str], None]) -> None:
     if not visible:
         st.info("No documents match this search." if documents else "No staff documents have been uploaded.")
         return
-    labels = [f"{row.get('filename', '')} · {row.get('category', '')} · {row.get('uploaded_at', '')[:10]}" for row in visible]
+    labels = [
+        f"{row.get('filename', '')} · {row.get('category', '')} · "
+        f"{row.get('uploaded_at', '')[:10]} · "
+        f"{len(row.get('shared_with', []))} student(s)"
+        for row in visible
+    ]
     selection = st.selectbox("Document", range(len(visible)), format_func=lambda value: labels[value], key="staff_document_selected")
     chosen = visible[selection]
     try:
@@ -1484,6 +1651,54 @@ def render_documents(audit_fn: Callable[[str, str], None]) -> None:
             st.warning(f"CSV preview is unavailable: {error}")
         else:
             st.dataframe(frame, width="stretch")
+
+    st.warning(
+        "Deleting a document permanently removes it for staff and every student it was shared with."
+    )
+    confirmation_key = f"confirm_delete_staff_document_{record['id']}"
+    if st.session_state.get(confirmation_key):
+        st.error(f"Delete **{record['filename']}** permanently?")
+        confirm_col, cancel_col = st.columns(2)
+        with confirm_col:
+            if st.button(
+                "Delete document permanently",
+                key=f"confirm_delete_staff_document_yes_{record['id']}",
+                type="primary",
+                icon=":material/delete_forever:",
+                width="stretch",
+            ):
+                try:
+                    deleted = staff_content.delete_document(str(record["id"]))
+                except (OSError, PermissionError, ValueError) as error:
+                    st.error(f"Could not delete the document: {error}")
+                else:
+                    if deleted:
+                        audit_fn(
+                            f"Deleted staff document '{record['filename']}'",
+                            auth.get_current_user_name() or auth.get_current_user_id() or "staff",
+                        )
+                        st.session_state.pop(confirmation_key, None)
+                        st.session_state.pop("staff_document_selected", None)
+                        st.session_state.pop("staff_document_operation", None)
+                        st.rerun()
+                    else:
+                        st.error("This document no longer exists.")
+        with cancel_col:
+            if st.button(
+                "Cancel",
+                key=f"confirm_delete_staff_document_no_{record['id']}",
+                width="stretch",
+            ):
+                st.session_state.pop(confirmation_key, None)
+                st.rerun()
+    elif st.button(
+        "Delete document",
+        key=f"delete_staff_document_{record['id']}",
+        type="secondary",
+        icon=":material/delete:",
+    ):
+        st.session_state[confirmation_key] = True
+        st.rerun()
 
 
 def render_announcements(audit_fn: Callable[[str, str], None]) -> None:
@@ -1563,15 +1778,25 @@ def render(
     pages = {
         "analytics": lambda: render_analytics(audit_fn),
         "review": lambda: render_question_review(audit_fn),
-        "knowledge": lambda: render_knowledge_base(audit_fn),
         "documents": lambda: render_documents(audit_fn),
-        "announcements": lambda: render_announcements(audit_fn),
     }
     if section == "dashboard":
         render_dashboard()
     elif section == "inquiries":
         st.session_state["staff_chat_heading"] = "Student Inquiries"
         chat_fn()
+    elif section == "knowledge_announcements":
+        selected_area = st.radio(
+            "Workspace",
+            ["Knowledge Base", "School Announcements"],
+            horizontal=True,
+            key="staff_knowledge_announcements_tab",
+            label_visibility="collapsed",
+        )
+        if selected_area == "Knowledge Base":
+            render_knowledge_base(audit_fn)
+        else:
+            render_announcements(audit_fn)
     elif section in pages:
         pages[section]()
     else:

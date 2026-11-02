@@ -8,10 +8,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import tempfile
+import hashlib
 import unittest
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
-from code import analytics_reports, auth, conversation, dialogue, knowledge, logger, staff_content
+from code import analytics_reports, auth, conversation, dialogue, handoff, knowledge, logger, staff_content
 
 
 class StaffWorkspaceStorageTests(unittest.TestCase):
@@ -42,22 +44,258 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
         with (
             patch.object(auth, "DATA_DIR", self.root),
             patch.object(auth, "USERS_FILE", self.root / "users.json"),
-            patch.object(auth, "is_staff", return_value=False),
         ):
             created, message = auth.create_account("new-staff", "password", role="staff")
             self.assertFalse(created)
-            self.assertIn("authenticated staff", message)
+            self.assertIn("authorized administrator", message)
             self.assertFalse((self.root / "users.json").exists())
 
-    def test_authenticated_staff_can_provision_another_staff_account(self) -> None:
+    def test_student_self_registration_uses_existing_store_and_secure_hash(self) -> None:
+        users_file = self.root / "users.json"
+        with (
+            patch.object(auth, "DATA_DIR", self.root),
+            patch.object(auth, "USERS_FILE", users_file),
+        ):
+            created, _ = auth.create_account("student-1", "password", "Student One")
+            self.assertTrue(created)
+            student = auth._load_users()["student-1"]
+            self.assertEqual(student["role"], "student")
+            self.assertTrue(student["password_hash"].startswith("pbkdf2_sha256$"))
+
+    def test_staff_login_ignores_id_letter_case(self) -> None:
+        users_file = self.root / "users.json"
+        session_state = {}
+        with (
+            patch.object(auth, "DATA_DIR", self.root),
+            patch.object(auth, "USERS_FILE", users_file),
+        ):
+            auth._save_users({
+                "Earl_Staff": {
+                    "password_hash": hashlib.sha256(b"legacy-pass").hexdigest(),
+                    "name": "Earl Staff",
+                    "role": "staff",
+                }
+            })
+            with patch.object(auth.st, "session_state", session_state):
+                success, message = auth.login(
+                    "Earl_staff", "legacy-pass", expected_role="staff"
+                )
+            self.assertTrue(success, message)
+            self.assertEqual(session_state[auth.SESSION_KEY], "Earl_Staff")
+            self.assertEqual(session_state[auth.SESSION_ROLE_KEY], "staff")
+
+    def test_bootstrap_admin_is_created_from_deployment_secrets_and_can_manage_staff(self) -> None:
+        users_file = self.root / "users.json"
+        session_state = {}
+        bootstrap_settings = {
+            "BOOTSTRAP_ADMIN_ID": "first-admin",
+            "BOOTSTRAP_ADMIN_PASSWORD": "initial-admin-password",
+            "BOOTSTRAP_ADMIN_NAME": "First Administrator",
+            "BOOTSTRAP_ADMIN_EMAIL": "admin@gra.edu",
+            "BOOTSTRAP_ADMIN_DEPARTMENT": "Administration",
+        }
+        with (
+            patch.object(auth, "DATA_DIR", self.root),
+            patch.object(auth, "USERS_FILE", users_file),
+            patch.object(auth, "ADMIN_ENV_PATH", self.root / "absent.env"),
+            patch.dict("os.environ", bootstrap_settings, clear=True),
+            patch.object(
+                auth,
+                "_deployment_setting",
+                side_effect=lambda key: bootstrap_settings.get(key, ""),
+            ),
+            patch.object(auth.st, "secrets", {}),
+            patch.object(auth.st, "session_state", session_state),
+        ):
+            success, message = auth.login(
+                "FIRST-ADMIN",
+                "initial-admin-password",
+                expected_role="staff",
+            )
+            self.assertTrue(success, message)
+            self.assertTrue(auth.is_admin())
+            created, message = auth.create_staff_account(
+                "new-staff",
+                "New Staff",
+                "new.staff@gra.edu",
+                "Registrar",
+                "staff-password",
+                "staff-password",
+            )
+            self.assertTrue(created, message)
+            users = auth._load_users()
+
+            self.assertEqual(users["first-admin"]["role"], "staff")
+            self.assertEqual(users["first-admin"]["email"], "admin@gra.edu")
+            self.assertEqual(users["new-staff"]["role"], "staff")
+            self.assertTrue(
+                auth._verify_password(
+                    "initial-admin-password",
+                    users["first-admin"]["password_hash"],
+                )
+            )
+
+    def test_admin_creates_staff_account_and_prevents_duplicate_ids_and_emails(self) -> None:
+        users_file = self.root / "users.json"
+        with (
+            patch.object(auth, "DATA_DIR", self.root),
+            patch.object(auth, "USERS_FILE", users_file),
+            patch.dict("os.environ", {"STAFF_ADMIN_IDS": "admin-1"}),
+            patch.object(auth, "is_staff", return_value=True),
+            patch.object(auth, "get_current_user_id", return_value="ADMIN-1"),
+        ):
+            original_student_hash = auth._hash_password("student-pass")
+            auth._save_users({
+                "student-1": {
+                    "password_hash": original_student_hash,
+                    "name": "Student One",
+                    "role": "student",
+                }
+            })
+            created, _ = auth.create_staff_account(
+                "staff-1",
+                "Staff One",
+                "STAFF.ONE@GRA.EDU",
+                "Registrar",
+                "secure-password",
+                "secure-password",
+            )
+            users = auth._load_users()
+
+            self.assertTrue(created)
+            self.assertEqual(users["student-1"]["role"], "student")
+            self.assertEqual(users["student-1"]["password_hash"], original_student_hash)
+            self.assertEqual(users["staff-1"]["role"], "staff")
+            self.assertEqual(users["staff-1"]["email"], "staff.one@gra.edu")
+            self.assertEqual(users["staff-1"]["department"], "Registrar")
+            self.assertTrue(
+                users["staff-1"]["password_hash"].startswith("pbkdf2_sha256$")
+            )
+            duplicate_id, _ = auth.create_staff_account(
+                "STAFF-1",
+                "Another Staff",
+                "another@gra.edu",
+                "Registrar",
+                "secure-password",
+                "secure-password",
+            )
+            duplicate_email, _ = auth.create_staff_account(
+                "staff-2",
+                "Another Staff",
+                "Staff.One@gra.edu",
+                "Registrar",
+                "secure-password",
+                "secure-password",
+            )
+            self.assertFalse(duplicate_id)
+            self.assertFalse(duplicate_email)
+
+    def test_created_staff_account_authenticates_with_staff_role(self) -> None:
+        users_file = self.root / "users.json"
+        session_state = {}
+        with (
+            patch.object(auth, "DATA_DIR", self.root),
+            patch.object(auth, "USERS_FILE", users_file),
+            patch.dict("os.environ", {"STAFF_ADMIN_IDS": "admin-1"}),
+            patch.object(auth, "is_staff", return_value=True),
+            patch.object(auth, "get_current_user_id", return_value="admin-1"),
+        ):
+            auth.create_staff_account(
+                "new-staff",
+                "New Staff",
+                "new.staff@gra.edu",
+                "Registrar",
+                "secure-password",
+                "secure-password",
+            )
+            with patch.object(auth.st, "session_state", session_state):
+                success, message = auth.login(
+                    "new-staff", "secure-password", expected_role="staff"
+                )
+
+            self.assertTrue(success, message)
+            self.assertEqual(session_state[auth.SESSION_KEY], "new-staff")
+            self.assertEqual(session_state[auth.SESSION_ROLE_KEY], "staff")
+            self.assertTrue(auth._verify_password(
+                "secure-password",
+                auth._load_users()["new-staff"]["password_hash"],
+            ))
+
+    def test_ordinary_staff_and_student_cannot_create_staff_accounts(self) -> None:
         with (
             patch.object(auth, "DATA_DIR", self.root),
             patch.object(auth, "USERS_FILE", self.root / "users.json"),
-            patch.object(auth, "is_staff", return_value=True),
+            patch.dict("os.environ", {"STAFF_ADMIN_IDS": "admin-1"}),
         ):
-            created, _ = auth.create_account("new-staff", "password", role="staff")
-            self.assertTrue(created)
-            self.assertEqual(auth._load_users()["new-staff"]["role"], "staff")
+            for role, user_id in (("staff", "staff-1"), ("student", "student-1")):
+                with (
+                    patch.object(auth, "is_staff", return_value=role == "staff"),
+                    patch.object(auth, "get_current_user_id", return_value=user_id),
+                ):
+                    created, _ = auth.create_staff_account(
+                        "new-staff",
+                        "New Staff",
+                        "new@gra.edu",
+                        "Registrar",
+                        "secure-password",
+                        "secure-password",
+                    )
+                    self.assertFalse(created)
+            self.assertFalse((self.root / "users.json").exists())
+
+    def test_staff_admin_allowlist_can_be_configured_from_dotenv(self) -> None:
+        env_file = self.root / ".env"
+        env_file.write_text("STAFF_ADMIN_IDS=admin-1,admin-2\n", encoding="utf-8")
+        with (
+            patch.object(auth, "ADMIN_ENV_PATH", env_file),
+            patch.dict("os.environ", {"STAFF_ADMIN_IDS": ""}),
+            patch.object(auth, "is_staff", return_value=True),
+            patch.object(auth, "get_current_user_id", return_value="ADMIN-2"),
+        ):
+            self.assertTrue(auth.is_admin())
+
+    def test_staff_creation_validates_fields_and_preserves_corrupt_database(self) -> None:
+        users_file = self.root / "users.json"
+        with (
+            patch.object(auth, "DATA_DIR", self.root),
+            patch.object(auth, "USERS_FILE", users_file),
+            patch.dict("os.environ", {"STAFF_ADMIN_IDS": "admin-1"}),
+            patch.object(auth, "is_staff", return_value=True),
+            patch.object(auth, "get_current_user_id", return_value="admin-1"),
+        ):
+            invalid, message = auth.create_staff_account(
+                "staff-1", "New Staff", "not-an-email", "Registrar",
+                "secure-password", "secure-password",
+            )
+            self.assertFalse(invalid)
+            self.assertIn("Official Email", message)
+
+            users_file.write_text("{invalid json", encoding="utf-8")
+            failed, message = auth.create_staff_account(
+                "staff-1", "New Staff", "new@gra.edu", "Registrar",
+                "secure-password", "secure-password",
+            )
+            self.assertFalse(failed)
+            self.assertIn("account database", message)
+            self.assertEqual(users_file.read_text(encoding="utf-8"), "{invalid json")
+
+    def test_staff_creation_rejects_mismatched_passwords(self) -> None:
+        with (
+            patch.dict("os.environ", {"STAFF_ADMIN_IDS": "admin-1"}),
+            patch.object(auth, "is_staff", return_value=True),
+            patch.object(auth, "get_current_user_id", return_value="admin-1"),
+        ):
+            created, message = auth.create_staff_account(
+                "staff-1", "New Staff", "new@gra.edu", "Registrar",
+                "secure-password", "different-password",
+            )
+            self.assertFalse(created)
+            self.assertIn("do not match", message)
+
+    def test_legacy_student_password_still_verifies(self) -> None:
+        legacy_hash = hashlib.sha256(b"legacy-pass").hexdigest()
+        self.assertTrue(auth._verify_password("legacy-pass", legacy_hash))
+        self.assertFalse(auth._verify_password("wrong-pass", legacy_hash))
 
     def test_approved_articles_are_searchable_but_drafts_are_not(self) -> None:
         articles_path = self.root / "articles.json"
@@ -91,8 +329,89 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
                     created["session_id"], "closed", "staff-1"
                 )
             self.assertIsNotNone(resolved)
-            self.assertTrue((conversations_dir / f"{created['session_id']}.json").exists())
             self.assertEqual(conversation.get_closed_conversations()[0]["status"], "closed")
+
+    def test_staff_request_gets_ai_fallback_after_timeout(self) -> None:
+        conversations_dir = self.root / "conversations"
+        with patch.object(conversation, "CONV_DIR", conversations_dir):
+            created = self._create_for_student("student-1", "Student")
+            with (
+                patch.object(auth, "is_student", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="student-1"),
+            ):
+                conversation.add_message(
+                    created["session_id"],
+                    "student",
+                    "What are the enrollment requirements?",
+                    sender_id="student-1",
+                )
+                waiting = conversation.update_conversation_status(
+                    created["session_id"], "waiting"
+                )
+                self.assertIsNotNone(waiting)
+                waiting_since = waiting["waiting_since"]
+                old_wait = (
+                    datetime.now() - timedelta(seconds=conversation.STAFF_RESPONSE_TIMEOUT_SECONDS + 1)
+                ).isoformat(timespec="microseconds")
+                waiting["waiting_since"] = old_wait
+                conversation._save_conversation(waiting)
+                self.assertEqual(
+                    conversation.staff_response_seconds_remaining(waiting),
+                    0,
+                )
+                fallback = conversation.add_staff_timeout_reply(
+                    created["session_id"],
+                    old_wait,
+                    "Here are the enrollment requirements.",
+                    {"staff_timeout_fallback": True},
+                )
+
+            self.assertIsNotNone(fallback)
+            self.assertEqual(fallback["role"], "assistant")
+            updated = conversation.get_conversation(created["session_id"])
+            self.assertEqual(updated["status"], "active")
+            self.assertNotIn("waiting_since", updated)
+            self.assertEqual(updated["messages"][-1]["text"], "Here are the enrollment requirements.")
+
+    def test_staff_reply_cancels_pending_ai_fallback(self) -> None:
+        conversations_dir = self.root / "conversations"
+        with patch.object(conversation, "CONV_DIR", conversations_dir):
+            created = self._create_for_student("student-1", "Student")
+            with (
+                patch.object(auth, "is_student", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="student-1"),
+            ):
+                waiting = conversation.update_conversation_status(
+                    created["session_id"], "waiting"
+                )
+            waiting_since = waiting["waiting_since"]
+            with (
+                patch.object(auth, "is_staff", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="staff-1"),
+            ):
+                conversation.assign_staff_to_conversation(
+                    created["session_id"], "staff-1", "Staff One"
+                )
+                conversation.add_message(
+                    created["session_id"],
+                    "staff",
+                    "I can help with that.",
+                    sender_id="staff-1",
+                )
+            with (
+                patch.object(auth, "is_student", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="student-1"),
+            ):
+                fallback = conversation.add_staff_timeout_reply(
+                    created["session_id"],
+                    waiting_since,
+                    "AI fallback",
+                )
+            self.assertIsNone(fallback)
+            updated = conversation.get_conversation(created["session_id"])
+            self.assertEqual(updated["messages"][-1]["role"], "staff")
+            self.assertNotIn("waiting_since", updated)
+            self.assertTrue((conversations_dir / f"{created['session_id']}.json").exists())
 
     def test_conversation_creation_requires_student_owner_and_accepts_session_id(self) -> None:
         conversations_dir = self.root / "conversations"
@@ -141,6 +460,131 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
                 "waiting",
             )
 
+    def test_handoff_service_queues_student_request_and_notice(self) -> None:
+        conversations_dir = self.root / "conversations"
+        with patch.object(conversation, "CONV_DIR", conversations_dir):
+            created = self._create_for_student("student-1", "Student One")
+            with (
+                patch.object(auth, "is_student", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="student-1"),
+            ):
+                updated, notice = handoff.request_staff_response(
+                    created["session_id"]
+                )
+            self.assertEqual(updated["status"], "waiting")
+            self.assertTrue(updated["waiting_since"])
+            self.assertEqual(notice["meta"]["intent"], "staff_requested")
+            self.assertEqual(
+                conversation.get_conversation(created["session_id"])["messages"][-1]["text"],
+                notice["text"],
+            )
+
+    def test_handoff_service_generates_fallback_only_for_own_expired_request(self) -> None:
+        conversations_dir = self.root / "conversations"
+        with patch.object(conversation, "CONV_DIR", conversations_dir):
+            created = self._create_for_student("student-1", "Student One")
+            with (
+                patch.object(auth, "is_student", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="student-1"),
+            ):
+                conversation.add_message(
+                    created["session_id"],
+                    "student",
+                    "How can I enroll?",
+                    sender_id="student-1",
+                )
+                waiting = conversation.update_conversation_status(
+                    created["session_id"], "waiting"
+                )
+                waiting["waiting_since"] = (
+                    datetime.now()
+                    - timedelta(seconds=conversation.STAFF_RESPONSE_TIMEOUT_SECONDS + 1)
+                ).isoformat(timespec="microseconds")
+                conversation._save_conversation(waiting)
+                policy = dialogue.Policy()
+                with patch.object(
+                    dialogue,
+                    "handle",
+                    return_value=dialogue.Reply(
+                        text="Here are the enrollment steps.",
+                        intent="ask_requirements",
+                        confidence=0.8,
+                        source="school knowledge",
+                    ),
+                ) as handle:
+                    fallback = handoff.generate_timeout_fallback(
+                        created["session_id"], "student-1", policy
+                    )
+
+                self.assertIsNotNone(fallback)
+                self.assertEqual(fallback["meta"]["source"], "AI fallback after staff response timeout")
+                self.assertEqual(fallback["text"], "Here are the enrollment steps.")
+                handle.assert_called_once()
+                with self.assertRaises(PermissionError):
+                    handoff.generate_timeout_fallback(
+                        created["session_id"], "student-2", policy
+                    )
+
+    def test_follow_up_to_assigned_staff_starts_fresh_response_timeout(self) -> None:
+        conversations_dir = self.root / "conversations"
+        with patch.object(conversation, "CONV_DIR", conversations_dir):
+            created = self._create_for_student("student-1", "Student One")
+            with (
+                patch.object(auth, "is_staff", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="staff-1"),
+            ):
+                assigned = conversation.assign_staff_to_conversation(
+                    created["session_id"], "staff-1", "Staff One"
+                )
+            self.assertIsNotNone(assigned)
+            self.assertNotIn("waiting_since", assigned)
+
+            with (
+                patch.object(auth, "is_student", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="student-1"),
+            ):
+                message = conversation.add_message(
+                    created["session_id"],
+                    "student",
+                    "I have one more question.",
+                    sender_id="student-1",
+                )
+
+            updated = conversation.get_conversation(created["session_id"])
+            self.assertEqual(message["text"], "I have one more question.")
+            self.assertEqual(updated["status"], "waiting")
+            self.assertTrue(updated.get("waiting_since"))
+            remaining = conversation.staff_response_seconds_remaining(updated)
+            self.assertIsNotNone(remaining)
+            self.assertGreaterEqual(remaining, 0)
+            self.assertLessEqual(remaining, conversation.STAFF_RESPONSE_TIMEOUT_SECONDS)
+
+    def test_staff_cannot_take_over_an_inquiry_owned_by_online_staff(self) -> None:
+        conversations_dir = self.root / "conversations"
+        with patch.object(conversation, "CONV_DIR", conversations_dir):
+            created = self._create_for_student("student-1", "Student One")
+            with (
+                patch.object(auth, "is_staff", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="staff-1"),
+            ):
+                assigned = conversation.assign_staff_to_conversation(
+                    created["session_id"], "staff-1", "Staff One"
+                )
+            self.assertIsNotNone(assigned)
+            with (
+                patch.object(auth, "is_staff", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="staff-2"),
+                patch.object(conversation.staff_presence, "is_staff_online", return_value=True),
+            ):
+                takeover = conversation.assign_staff_to_conversation(
+                    created["session_id"], "staff-2", "Staff Two"
+                )
+            self.assertIsNone(takeover)
+            self.assertEqual(
+                conversation.get_conversation(created["session_id"])["assigned_staff"],
+                "staff-1",
+            )
+
     def test_messages_enforce_owner_role_resolution_and_order(self) -> None:
         conversations_dir = self.root / "conversations"
         with patch.object(conversation, "CONV_DIR", conversations_dir):
@@ -173,6 +617,17 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
                 patch.object(auth, "is_staff", return_value=True),
                 patch.object(auth, "get_current_user_id", return_value="staff-1"),
             ):
+                with self.assertRaisesRegex(PermissionError, "Take over"):
+                    conversation.add_message(
+                        session_id,
+                        "staff",
+                        "The cashier is open until 4 PM.",
+                        sender_id="staff-1",
+                    )
+                assigned = conversation.assign_staff_to_conversation(
+                    session_id, "staff-1", "Staff One"
+                )
+                self.assertIsNotNone(assigned)
                 staff_message = conversation.add_message(
                     session_id,
                     "staff",
@@ -339,15 +794,129 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
             patch.object(staff_content, "DOCUMENT_DIR", document_dir),
         ):
             created = staff_content.save_document(
-                "..\\registrar.txt", b"first version", "Registrar", "staff-1"
+                "..\\registrar.txt",
+                b"first version",
+                "Registrar",
+                "staff-1",
+                ["student-1"],
             )
             replaced = staff_content.replace_document(
-                created["id"], "updated.txt", b"updated version", "Registrar", "staff-1"
+                created["id"],
+                "updated.txt",
+                b"updated version",
+                "Registrar",
+                "staff-1",
+                ["student-2"],
             )
             record, content = staff_content.read_document(replaced["id"])
             self.assertEqual(record["filename"], "updated.txt")
             self.assertEqual(content, b"updated version")
             self.assertRegex(record["stored_name"], r"^[a-f0-9]{32}\.txt$")
+            self.assertEqual(record["shared_with"], ["student-2"])
+            self.assertEqual(staff_content.documents_for_student("STUDENT-2"), [record])
+            self.assertEqual(staff_content.documents_for_student("student-1"), [])
+            with (
+                patch.object(auth, "is_student", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="student-2"),
+            ):
+                with self.assertRaises(PermissionError):
+                    staff_content.read_document_for_student(record["id"], "student-1")
+                student_record, student_content = staff_content.read_document_for_student(
+                    record["id"], "student-2"
+                )
+            with (
+                patch.object(auth, "is_student", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="student-1"),
+                self.assertRaises(PermissionError),
+            ):
+                staff_content.read_document_for_student(record["id"], "student-1")
+            self.assertEqual(student_record["id"], record["id"])
+            self.assertEqual(student_content, b"updated version")
+
+    def test_document_upload_size_validation_distinguishes_empty_from_too_large(self) -> None:
+        self.assertEqual(staff_content.MAX_DOCUMENT_BYTES, 500 * 1024 * 1024)
+        with self.assertRaisesRegex(ValueError, "selected document is empty"):
+            staff_content._validate_document_content(b"")
+        with patch.object(staff_content, "MAX_DOCUMENT_BYTES", 3):
+            with self.assertRaisesRegex(ValueError, "maximum allowed size is 0 MB"):
+                staff_content._validate_document_content(b"four")
+
+    def test_student_can_remove_only_their_own_shared_document_access(self) -> None:
+        with (
+            patch.object(staff_content, "DATA_DIR", self.root),
+            patch.object(staff_content, "DOCUMENTS_PATH", self.root / "documents.json"),
+            patch.object(staff_content, "DOCUMENT_DIR", self.root / "documents"),
+        ):
+            record = staff_content.save_document(
+                "school-guide.txt",
+                b"Guide",
+                "Student Services",
+                "staff-1",
+                ["student-1", "student-2"],
+            )
+            with (
+                patch.object(auth, "is_student", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="STUDENT-1"),
+            ):
+                self.assertTrue(
+                    staff_content.remove_shared_document_for_student(
+                        record["id"], "student-1"
+                    )
+                )
+            self.assertEqual(staff_content.documents_for_student("student-1"), [])
+            self.assertEqual(
+                staff_content.documents_for_student("student-2")[0]["id"],
+                record["id"],
+            )
+            with (
+                patch.object(auth, "is_student", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="student-1"),
+                self.assertRaises(PermissionError),
+            ):
+                staff_content.remove_shared_document_for_student(
+                    record["id"], "student-2"
+                )
+            with (
+                patch.object(auth, "is_student", return_value=False),
+                patch.object(auth, "get_current_user_id", return_value="staff-1"),
+                self.assertRaises(PermissionError),
+            ):
+                staff_content.remove_shared_document_for_student(
+                    record["id"], "student-1"
+                )
+
+    def test_staff_can_delete_shared_document_and_revoke_all_access(self) -> None:
+        document_dir = self.root / "documents"
+        with (
+            patch.object(staff_content, "DATA_DIR", self.root),
+            patch.object(staff_content, "DOCUMENTS_PATH", self.root / "documents.json"),
+            patch.object(staff_content, "DOCUMENT_DIR", document_dir),
+        ):
+            record = staff_content.save_document(
+                "school-guide.txt",
+                b"Guide",
+                "Student Services",
+                "staff-1",
+                ["student-1", "student-2"],
+            )
+            stored_path = document_dir / record["stored_name"]
+            self.assertTrue(stored_path.is_file())
+
+            with (
+                patch.object(auth, "is_staff", return_value=True),
+                patch.object(auth, "is_student", return_value=False),
+            ):
+                self.assertTrue(staff_content.delete_document(record["id"]))
+
+            self.assertFalse(stored_path.exists())
+            self.assertEqual(staff_content.load_documents(), [])
+            self.assertEqual(staff_content.documents_for_student("student-1"), [])
+            self.assertEqual(staff_content.documents_for_student("student-2"), [])
+            with (
+                patch.object(auth, "is_staff", return_value=False),
+                self.assertRaises(PermissionError),
+            ):
+                staff_content.delete_document(record["id"])
 
     def test_analytics_report_history_and_saved_exports(self) -> None:
         report_dir = self.root / "reports"

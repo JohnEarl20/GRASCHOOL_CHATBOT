@@ -1,12 +1,18 @@
 """Unified authentication for students and staff.
 
 File-based auth stored in data/users.json with role field.
-Passwords are hashed with SHA-256 (not production grade, but fine for a class prototype).
+New passwords use salted PBKDF2-SHA256. Existing SHA-256 password hashes remain
+supported so legacy accounts can continue to sign in.
 """
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import os
+import re
+import secrets
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -15,80 +21,350 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
 USERS_FILE = DATA_DIR / "users.json"
+ADMIN_ENV_PATH = ROOT / ".env"
 
 SESSION_KEY = "user_id"
 SESSION_ROLE_KEY = "user_role"
+PASSWORD_SCHEME = "pbkdf2_sha256"
+PASSWORD_ITERATIONS = 600_000
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_ACCOUNT_LOCK = threading.RLock()
+
+
+class AccountStoreError(RuntimeError):
+    """Raised when the account store cannot be read or safely updated."""
 
 
 def _ensure_data_dir() -> None:
     DATA_DIR.mkdir(exist_ok=True)
 
 
-def _load_users() -> dict:
-    _ensure_data_dir()
-    if not USERS_FILE.exists():
-        return {}
+def _deployment_setting(name: str) -> str:
+    value = os.environ.get(name, "").strip()
+    if value:
+        return value
+
+    if ADMIN_ENV_PATH.is_file():
+        try:
+            for raw_line in ADMIN_ENV_PATH.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                key, separator, raw_value = line.partition("=")
+                if separator and key.strip() == name:
+                    value = raw_value.strip().strip('"').strip("'")
+                    if value:
+                        return value
+        except OSError:
+            pass
+
     try:
-        return json.loads(USERS_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return {}
+        secret = st.secrets.get(name, "")
+    except (FileNotFoundError, KeyError, AttributeError, RuntimeError):
+        secret = ""
+    return str(secret).strip() if secret else ""
+
+
+def _bootstrap_admin_values() -> tuple[str, str, str, str, str]:
+    return (
+        _deployment_setting("BOOTSTRAP_ADMIN_ID"),
+        _deployment_setting("BOOTSTRAP_ADMIN_PASSWORD"),
+        _deployment_setting("BOOTSTRAP_ADMIN_NAME") or "GRA SCHOOL Administrator",
+        _deployment_setting("BOOTSTRAP_ADMIN_EMAIL"),
+        _deployment_setting("BOOTSTRAP_ADMIN_DEPARTMENT") or "Administration",
+    )
+
+
+def _ensure_bootstrap_admin(users: dict) -> bool:
+    """Create the initial admin from private deployment settings if configured."""
+    admin_id, password, name, email, department = _bootstrap_admin_values()
+    if not admin_id and not password:
+        return False
+    if not admin_id or not password:
+        raise AccountStoreError(
+            "Both BOOTSTRAP_ADMIN_ID and BOOTSTRAP_ADMIN_PASSWORD must be configured."
+        )
+    if len(admin_id) > 64 or any(ord(char) < 32 for char in admin_id):
+        raise AccountStoreError(
+            "BOOTSTRAP_ADMIN_ID must be a valid ID of at most 64 characters."
+        )
+    if len(password) < 8:
+        raise AccountStoreError("BOOTSTRAP_ADMIN_PASSWORD must contain at least 8 characters.")
+
+    matching_id = next(
+        (existing_id for existing_id in users if existing_id.casefold() == admin_id.casefold()),
+        None,
+    )
+    if matching_id is not None:
+        if users[matching_id].get("role") != "staff":
+            raise AccountStoreError(
+                "BOOTSTRAP_ADMIN_ID already belongs to a non-staff account."
+            )
+        return False
+
+    normalized_email = email.casefold()
+    if normalized_email:
+        if len(normalized_email) > 254 or not EMAIL_PATTERN.fullmatch(normalized_email):
+            raise AccountStoreError("BOOTSTRAP_ADMIN_EMAIL is invalid.")
+        if any(
+            isinstance(record.get("email"), str)
+            and record["email"].strip().casefold() == normalized_email
+            for record in users.values()
+        ):
+            raise AccountStoreError("BOOTSTRAP_ADMIN_EMAIL is already used by another account.")
+
+    users[admin_id] = {
+        "password_hash": _hash_password(password),
+        "name": name,
+        "email": normalized_email,
+        "department": department,
+        "role": "staff",
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    return True
+
+
+def _load_users() -> dict:
+    with _ACCOUNT_LOCK:
+        try:
+            _ensure_data_dir()
+            users = (
+                json.loads(USERS_FILE.read_text(encoding="utf-8"))
+                if USERS_FILE.exists()
+                else {}
+            )
+        except (json.JSONDecodeError, OSError) as error:
+            raise AccountStoreError(f"Could not read the account database: {error}") from error
+        if not isinstance(users, dict) or any(
+            not isinstance(user_id, str) or not isinstance(record, dict)
+            for user_id, record in users.items()
+        ):
+            raise AccountStoreError("The account database has an invalid format.")
+        if _ensure_bootstrap_admin(users):
+            _save_users(users)
+        return users
 
 
 def _save_users(users: dict) -> None:
-    _ensure_data_dir()
-    USERS_FILE.write_text(json.dumps(users, indent=2), encoding="utf-8")
+    temporary_path = None
+    try:
+        _ensure_data_dir()
+        temporary_path = USERS_FILE.with_name(
+            f"{USERS_FILE.name}.{secrets.token_hex(8)}.tmp"
+        )
+        temporary_path.write_text(
+            json.dumps(users, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        temporary_path.replace(USERS_FILE)
+    except OSError as error:
+        try:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise AccountStoreError(f"Could not save the account database: {error}") from error
 
 
 def _hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        PASSWORD_ITERATIONS,
+    )
+    return (
+        f"{PASSWORD_SCHEME}${PASSWORD_ITERATIONS}"
+        f"${salt.hex()}${digest.hex()}"
+    )
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    if stored_hash.startswith(f"{PASSWORD_SCHEME}$"):
+        try:
+            scheme, iteration_value, salt_hex, digest_hex = stored_hash.split("$")
+            if scheme != PASSWORD_SCHEME:
+                return False
+            iterations = int(iteration_value)
+            if not 100_000 <= iterations <= 2_000_000:
+                return False
+            expected = bytes.fromhex(digest_hex)
+            actual = hashlib.pbkdf2_hmac(
+                "sha256",
+                password.encode("utf-8"),
+                bytes.fromhex(salt_hex),
+                iterations,
+            )
+        except (ValueError, TypeError):
+            return False
+        return hmac.compare_digest(actual, expected)
+
+    # Keep accounts created by the original SHA-256 implementation usable.
+    legacy_digest = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return hmac.compare_digest(stored_hash, legacy_digest)
+
+
+def _account_id_exists(users: dict, user_id: str) -> bool:
+    normalized_id = user_id.casefold()
+    return any(existing_id.casefold() == normalized_id for existing_id in users)
+
+
+def _configured_admin_ids() -> set[str]:
+    configured = os.environ.get("STAFF_ADMIN_IDS", "").strip()
+    if not configured:
+        configured = _deployment_setting("STAFF_ADMIN_IDS")
+    admin_ids: set[str] = set()
+    if configured:
+        admin_ids.update(
+            value.strip().casefold()
+            for value in configured.split(",")
+            if value.strip()
+        )
+    if not admin_ids:
+        try:
+            configured_list = st.secrets.get("STAFF_ADMIN_IDS")
+            if configured_list is None:
+                configured_list = st.secrets.get("staff", {}).get("admin_ids", [])
+        except (FileNotFoundError, KeyError, AttributeError, RuntimeError):
+            configured_list = []
+        if isinstance(configured_list, str):
+            configured_list = configured_list.split(",")
+        if isinstance(configured_list, (list, tuple, set)):
+            admin_ids.update(
+                str(value).strip().casefold()
+                for value in configured_list
+                if str(value).strip()
+            )
+
+    bootstrap_admin_id, _, _, _, _ = _bootstrap_admin_values()
+    if bootstrap_admin_id:
+        admin_ids.add(bootstrap_admin_id.casefold())
+    return admin_ids
+
+
+def _find_account(users: dict, user_id: str) -> tuple[str | None, dict | None]:
+    """Find an account by ID without making identifier casing significant."""
+    normalized_id = user_id.strip().casefold()
+    matches = [
+        (stored_id, record)
+        for stored_id, record in users.items()
+        if stored_id.casefold() == normalized_id
+    ]
+    if len(matches) > 1:
+        return None, None
+    return matches[0] if matches else (None, None)
 
 
 def create_account(user_id: str, password: str, name: str = "", role: str = "student") -> tuple[bool, str]:
-    """Create a new account. Returns (success, message)."""
-    user_id = user_id.strip()
-    users = _load_users()
-
+    """Create a public student account; staff must use the admin-only flow."""
+    if role != "student":
+        return False, "Staff accounts can only be created by an authorized administrator."
+    user_id = user_id.strip() if isinstance(user_id, str) else ""
     if not user_id:
-        return False, "ID is required"
+        return False, "ID is required."
+    if len(user_id) > 64 or any(ord(char) < 32 for char in user_id):
+        return False, "ID must be at most 64 characters and contain no control characters."
+    if not isinstance(password, str) or len(password) < 4:
+        return False, "Password must be at least 4 characters."
+    try:
+        with _ACCOUNT_LOCK:
+            users = _load_users()
+            if _account_id_exists(users, user_id):
+                return False, "An account with this ID already exists."
+            users[user_id] = {
+                "password_hash": _hash_password(password),
+                "name": name.strip() if isinstance(name, str) else "",
+                "role": "student",
+                "created_at": datetime.now().isoformat(timespec="seconds"),
+            }
+            _save_users(users)
+    except AccountStoreError as error:
+        return False, str(error)
+    return True, "Student account created successfully."
 
-    if user_id in users:
-        return False, f"{role.capitalize()} ID already exists"
 
-    if len(password) < 4:
-        return False, "Password must be at least 4 characters"
+def create_staff_account(
+    user_id: str,
+    full_name: str,
+    email: str,
+    department: str,
+    password: str,
+    confirm_password: str,
+) -> tuple[bool, str]:
+    """Create a staff account only for an explicitly allowlisted administrator."""
+    if not is_admin():
+        return False, "Only an authorized administrator can create staff accounts."
 
-    if role not in ("student", "staff"):
-        return False, "Invalid role"
+    user_id = user_id.strip() if isinstance(user_id, str) else ""
+    full_name = full_name.strip() if isinstance(full_name, str) else ""
+    email = email.strip().casefold() if isinstance(email, str) else ""
+    department = department.strip() if isinstance(department, str) else ""
 
-    if role == "staff" and not is_staff():
-        return False, "Only an authenticated staff member can create staff accounts"
+    if not user_id or len(user_id) > 64 or any(ord(char) < 32 for char in user_id):
+        return False, "Enter a valid Staff ID (1-64 characters)."
+    if len(full_name) < 2 or len(full_name) > 120:
+        return False, "Full Name must be between 2 and 120 characters."
+    if len(email) > 254 or not EMAIL_PATTERN.fullmatch(email):
+        return False, "Enter a valid Official Email address."
+    if len(department) < 2 or len(department) > 100:
+        return False, "Department must be between 2 and 100 characters."
+    if not isinstance(password, str) or len(password) < 8:
+        return False, "Password must be at least 8 characters."
+    if password != confirm_password:
+        return False, "Password and Confirm Password do not match."
 
-    users[user_id] = {
-        "password_hash": _hash_password(password),
-        "name": name.strip(),
-        "role": role,
-        "created_at": datetime.now().isoformat(),
-    }
-    _save_users(users)
-    return True, f"{role.capitalize()} account created successfully"
+    try:
+        with _ACCOUNT_LOCK:
+            users = _load_users()
+            if _account_id_exists(users, user_id):
+                return False, "An account with this Staff ID already exists."
+            if any(
+                isinstance(record.get("email"), str)
+                and record["email"].strip().casefold() == email
+                for record in users.values()
+            ):
+                return False, "An account with this email address already exists."
+
+            users[user_id] = {
+                "password_hash": _hash_password(password),
+                "name": full_name,
+                "email": email,
+                "department": department,
+                "role": "staff",
+                "created_at": datetime.now().isoformat(timespec="seconds"),
+            }
+            _save_users(users)
+    except AccountStoreError as error:
+        return False, str(error)
+    return True, "Staff account created successfully. The new staff member can log in now."
 
 
 def login(user_id: str, password: str, expected_role: str | None = None) -> tuple[bool, str]:
     """Verify credentials and log in. Returns (success, message)."""
-    users = _load_users()
+    user_id = user_id.strip() if isinstance(user_id, str) else ""
+    if not user_id or not isinstance(password, str):
+        return False, "Please enter both ID and password."
+    try:
+        users = _load_users()
+    except AccountStoreError as error:
+        return False, str(error)
 
-    if user_id not in users:
+    stored_id, account = _find_account(users, user_id)
+    if account is None:
         return False, "ID not found"
 
-    if users[user_id]["password_hash"] != _hash_password(password):
+    stored_hash = account.get("password_hash")
+    if not isinstance(stored_hash, str) or not _verify_password(password, stored_hash):
         return False, "Incorrect password"
 
-    if expected_role and users[user_id]["role"] != expected_role:
+    role = account.get("role")
+    if role not in {"student", "staff"}:
+        return False, "This account has an invalid role. Contact an administrator."
+    if expected_role and role != expected_role:
         return False, f"This account is not a {expected_role} account"
 
-    st.session_state[SESSION_KEY] = user_id
-    st.session_state[SESSION_ROLE_KEY] = users[user_id]["role"]
-    return True, f"Welcome, {users[user_id].get('name', user_id)}"
+    st.session_state[SESSION_KEY] = stored_id
+    st.session_state[SESSION_ROLE_KEY] = role
+    return True, f"Welcome, {account.get('name', user_id)}"
 
 
 def logout() -> None:
@@ -114,7 +390,8 @@ def get_current_user_name() -> str | None:
     if not user_id:
         return None
     users = _load_users()
-    return users.get(user_id, {}).get("name")
+    _, account = _find_account(users, user_id)
+    return account.get("name") if account else None
 
 
 def is_staff() -> bool:
@@ -123,3 +400,13 @@ def is_staff() -> bool:
 
 def is_student() -> bool:
     return get_current_user_role() == "student"
+
+
+def is_admin() -> bool:
+    """Return whether the signed-in staff ID is configured as an administrator."""
+    user_id = get_current_user_id()
+    return bool(
+        is_staff()
+        and user_id
+        and user_id.strip().casefold() in _configured_admin_ids()
+    )
