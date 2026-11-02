@@ -41,6 +41,13 @@ st.set_page_config(
     page_icon="G",
     layout="wide",
     initial_sidebar_state="auto",
+    menu_items={
+        "About": (
+            "Cognitive Campus Assistant - enrollment requirements and student "
+            "services advisor for the Registrar Office (CS ELEC 6).\n\n"
+            "[Open GRA SCHOOL on Render](https://graschool-chatbot.onrender.com)"
+        )
+    },
 )
 
 INTENT_LABELS = {
