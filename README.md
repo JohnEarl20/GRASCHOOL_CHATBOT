@@ -30,6 +30,26 @@ python -m streamlit run app.py
 
 Open your browser to: **http://localhost:8501**
 
+### Deploy to Render
+
+The repository includes a Render Blueprint in `render.yaml`. In Render, choose
+**New → Blueprint**, connect `JohnEarl20/GRASCHOOL_CHATBOT`, and deploy the
+`graschool-chatbot` web service. The Blueprint installs `requirements.txt`,
+starts Streamlit on Render's assigned port, and checks Streamlit's health
+endpoint.
+
+When prompted for `BOOTSTRAP_ADMIN_ID` and `BOOTSTRAP_ADMIN_PASSWORD`, enter
+the initial staff administrator ID and a unique password of at least eight
+characters. Keep the password in Render's environment settings only; never
+commit it to GitHub. The administrator is created on first account-store
+access. For an already-created web service that is not managed by a Blueprint,
+set these same variables under **Environment** in that service and redeploy.
+
+Render's free service has an ephemeral filesystem. Accounts, conversations,
+documents, and other local data can be lost when the service restarts or
+deploys. Do not rely on it for durable school records without moving data to
+persistent storage or a database.
+
 ### 3. Run Regression Checks & Tests
 
 ```bash
