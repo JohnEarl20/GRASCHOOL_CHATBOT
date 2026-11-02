@@ -23,12 +23,14 @@ python scripts/train_models.py
 
 ### 2. Run the Application
 
+Run this command in the project root to start the app on your computer:
+
 ```bash
-# Launch Streamlit on local port 8501
 python -m streamlit run app.py
 ```
 
-Open your browser to: **http://localhost:8501**
+Then open **http://localhost:8501** in your browser. This is the local
+development command; it does not deploy the app.
 
 ### Deploy to Render
 
@@ -37,6 +39,15 @@ The repository includes a Render Blueprint in `render.yaml`. In Render, choose
 `graschool-chatbot` web service. The Blueprint installs `requirements.txt`,
 starts Streamlit on Render's assigned port, and checks Streamlit's health
 endpoint.
+
+Render starts the deployed app with:
+
+```bash
+python -m streamlit run app.py --server.address 0.0.0.0 --server.port $PORT
+```
+
+This command is already configured in `render.yaml`; do not use `$PORT` in
+Windows PowerShell for local development.
 
 #### Keep student accounts after redeploys
 
