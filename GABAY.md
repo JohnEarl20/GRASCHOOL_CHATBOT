@@ -1,4 +1,4 @@
-# GABAY.md — Kumpletong Paliwanag ng EarlCHATBOT
+# GABAY.md — EarlCHATBOT
 
 **Proyekto:** Cognitive Campus Assistant (EarlCHATBOT)
 **Para saan:** Enrollment requirements at student services ng Registrar's Office ng **GRA SCHOOL**
