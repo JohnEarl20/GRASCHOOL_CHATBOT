@@ -3,14 +3,15 @@
     python -m pytest tests/ -q          (if pytest is installed)
     python tests/test_app.py             (plain runner, no dependency)
 
-Three groups:
+Five groups:
 
 1. Rule cases - 20 hand-made cases over the rule base, the "100% of 20
    hand-made cases" target of proposal section 13.
 2. Agreement - the ontology and the rule base must agree about which
    documents each student type needs.
-3. Conversation - the confidence policy, session memory, hand-off and the
-   entity extraction behind them.
+3. Entity extraction - Taglish normalization and student/document facts.
+4. Conversation - the confidence policy, session memory, and hand-off.
+5. Sentiment - the trained feedback model loads and returns a prediction.
 """
 from __future__ import annotations
 
@@ -22,7 +23,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import rules_trace
-from code import dialogue, knowledge, nlu
+from code import dialogue, knowledge, nlu, sentiment
 
 PASSED = 0
 FAILED: list[str] = []
@@ -279,11 +280,22 @@ def test_dialogue() -> None:
     check("[chat] course answer", "CS 102" in reply.text, reply.text[:160])
 
 
+def test_sentiment_model() -> None:
+    prediction = sentiment.SentimentModel.load().predict("thanks, that was helpful")
+    check(
+        "[sentiment] model loads and predicts",
+        prediction.sentiment in {"positive", "neutral", "negative"}
+        and 0.0 <= prediction.confidence <= 1.0,
+        str(prediction),
+    )
+
+
 def main() -> int:
     test_rule_cases()
     test_ontology_agreement()
     test_nlu()
     test_dialogue()
+    test_sentiment_model()
 
     print(f"checks passed: {PASSED}")
     if FAILED:

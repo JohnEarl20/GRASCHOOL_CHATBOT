@@ -191,6 +191,6 @@
   "seed": 42,
   "test_size": 0.2,
   "caveat": "The hold-out split is drawn from the same writer distribution as the training data, so these numbers are optimistic. The proposal's target is macro F1 >= 0.80 on 50 questions written by a member who did not write the training phrases - that set does not exist yet.",
-  "trained_at": "2026-10-22T23:32:26",
+  "trained_at": "2026-11-02T12:42:51",
   "model_path": "models\\intent_model.joblib"
 }

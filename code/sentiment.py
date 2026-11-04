@@ -115,7 +115,7 @@ class SentimentModel:
     def load(cls) -> "SentimentModel":
         if not MODEL_PATH.exists():
             train(force=True)
-        return cls(joblib.load(MOD_PATH))
+        return cls(joblib.load(MODEL_PATH))
 
     def predict(self, text: str) -> SentimentPrediction:
         probabilities = self.pipeline.predict_proba([normalize(text)])[0]

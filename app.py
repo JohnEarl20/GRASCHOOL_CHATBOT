@@ -759,6 +759,12 @@ def _request_staff_response(conversation_id: str) -> None:
     st.rerun()
 
 
+def _apply_staff_quick_reply(conversation_id: str) -> None:
+    selected_template = st.session_state.get(f"quick_{conversation_id}")
+    if selected_template:
+        st.session_state[f"staff_reply_{conversation_id}"] = selected_template
+
+
 @st.fragment(run_every=5)
 def _poll_staff_response_timeout(conversation_id: str, student_id: str) -> None:
     conv = conversation.get_conversation(conversation_id)
@@ -769,6 +775,17 @@ def _poll_staff_response_timeout(conversation_id: str, student_id: str) -> None:
         return
     remaining = conversation.staff_response_seconds_remaining(conv)
     if remaining is None:
+        return
+    online_staff = conversation.get_available_staff()
+    if online_staff:
+        staff_names = ", ".join(
+            str(member.get("staff_name") or member.get("staff_id") or "Staff")
+            for member in online_staff
+        )
+        st.caption(
+            f"Waiting for an online staff member ({staff_names}) to reply. "
+            "Your question will stay in the staff queue."
+        )
         return
     if remaining > 0:
         minutes, seconds = divmod(remaining, 60)
@@ -865,8 +882,8 @@ def render_chat() -> None:
                     student_id,
                 )
                 st.info(
-                    "🕐 **Waiting for staff response.** GRA AI will answer automatically "
-                    "after 5 seconds if no staff member replies."
+                    "🕐 **Your request is in the staff queue.** Online staff can reply here; "
+                    "GRA AI will answer after 5 seconds if no staff are available."
                 )
             elif status == "waiting":
                 st.info("🕐 **Waiting for staff response...** Your message is in the staff queue.")
@@ -937,11 +954,23 @@ def render_chat() -> None:
                     )
                 )
                 if can_request_staff and auth.is_student():
-                    st.caption(
-                        "If GRA AI could not answer your question, you can ask a staff member to review it."
-                    )
+                    online_staff = conversation.get_available_staff()
+                    if online_staff:
+                        names = ", ".join(
+                            str(member.get("staff_name") or member.get("staff_id") or "Staff")
+                            for member in online_staff
+                        )
+                        st.caption(
+                            f"GRA AI could not answer this question. Online staff: {names}. "
+                            "Send it to the staff queue for a reply."
+                        )
+                    else:
+                        st.caption(
+                            "GRA AI could not answer this question. No staff are online now, "
+                            "but you can still send it to the staff queue."
+                        )
                     if st.button(
-                        "Ask staff to answer",
+                        "Ask online staff to answer" if online_staff else "Send to staff queue",
                         key=f"request_staff_{current_conversation['session_id']}_{index}",
                         icon=":material/support_agent:",
                         type="primary",
@@ -1570,11 +1599,23 @@ def _render_staff_chat() -> None:
                 help="Check for new messages from the student.",
             ):
                 st.rerun()
-            pending_template = st.session_state.pop(f"staff_reply_template_{selected_session_id}", None)
-            if pending_template:
-                st.session_state[f"staff_reply_{selected_session_id}"] = pending_template
+            quick_replies = [
+                "Hello! I'm a registrar staff member. How can I help you?",
+                "I've checked your records and here's what I found...",
+                "Please visit the Registrar's Office at Main Building Room 101 during office hours.",
+                "Your request has been processed. You'll receive a confirmation email shortly.",
+                "Let me transfer you to the appropriate department.",
+            ]
+            st.selectbox(
+                "Quick reply",
+                [""] + quick_replies,
+                key=f"quick_{selected_session_id}",
+                on_change=_apply_staff_quick_reply,
+                args=(selected_session_id,),
+                help="Choose a template to place it in Your response.",
+            )
             reply_text = st.text_area("Your response", key=f"staff_reply_{selected_session_id}", height=100)
-            col1, col2 = st.columns([1, 4])
+            col1, _ = st.columns([1, 4])
             with col1:
                 if st.button("Send reply", key=f"send_{selected_session_id}", type="primary", width="stretch"):
                     if reply_text.strip():
@@ -1596,18 +1637,6 @@ def _render_staff_chat() -> None:
                                 st.rerun()
                     else:
                         st.warning("Please enter a message")
-            with col2:
-                quick_replies = [
-                    "Hello! I'm a registrar staff member. How can I help you?",
-                    "I've checked your records and here's what I found...",
-                    "Please visit the Registrar's Office at Main Building Room 101 during office hours.",
-                    "Your request has been processed. You'll receive a confirmation email shortly.",
-                    "Let me transfer you to the appropriate department.",
-                ]
-                selected_template = st.selectbox("Quick reply", [""] + quick_replies, key=f"quick_{selected_session_id}")
-                if selected_template and st.button("Use Template", key=f"use_template_{selected_session_id}"):
-                    st.session_state[f"staff_reply_template_{selected_session_id}"] = selected_template
-                    st.rerun()
 
 
 def _unanswered_table_html(rows: list[dict]) -> str:

@@ -796,16 +796,19 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
                 ).isoformat(timespec="microseconds")
                 conversation._save_conversation(waiting)
                 policy = dialogue.Policy()
-                with patch.object(
-                    dialogue,
-                    "handle",
-                    return_value=dialogue.Reply(
-                        text="Here are the enrollment steps.",
-                        intent="ask_requirements",
-                        confidence=0.8,
-                        source="school knowledge",
-                    ),
-                ) as handle:
+                with (
+                    patch.object(conversation, "get_available_staff", return_value=[]),
+                    patch.object(
+                        dialogue,
+                        "handle",
+                        return_value=dialogue.Reply(
+                            text="Here are the enrollment steps.",
+                            intent="ask_requirements",
+                            confidence=0.8,
+                            source="school knowledge",
+                        ),
+                    ) as handle,
+                ):
                     fallback = handoff.generate_timeout_fallback(
                         created["session_id"], "student-1", policy
                     )
@@ -818,6 +821,48 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
                     handoff.generate_timeout_fallback(
                         created["session_id"], "student-2", policy
                     )
+
+    def test_handoff_waits_for_online_staff_before_ai_fallback(self) -> None:
+        conversations_dir = self.root / "conversations"
+        with patch.object(conversation, "CONV_DIR", conversations_dir):
+            created = self._create_for_student("student-1", "Student One")
+            with (
+                patch.object(auth, "is_student", return_value=True),
+                patch.object(auth, "get_current_user_id", return_value="student-1"),
+            ):
+                conversation.add_message(
+                    created["session_id"],
+                    "student",
+                    "I need help with an unanswered question.",
+                    sender_id="student-1",
+                )
+                waiting = conversation.update_conversation_status(
+                    created["session_id"], "waiting"
+                )
+                waiting["waiting_since"] = (
+                    datetime.now()
+                    - timedelta(seconds=conversation.STAFF_RESPONSE_TIMEOUT_SECONDS + 1)
+                ).isoformat(timespec="microseconds")
+                conversation._save_conversation(waiting)
+
+                with (
+                    patch.object(
+                        conversation,
+                        "get_available_staff",
+                        return_value=[{"staff_id": "staff-1", "staff_name": "Staff One"}],
+                    ),
+                    patch.object(dialogue, "handle") as handle,
+                ):
+                    fallback = handoff.generate_timeout_fallback(
+                        created["session_id"], "student-1", dialogue.Policy()
+                    )
+
+            self.assertIsNone(fallback)
+            handle.assert_not_called()
+            self.assertEqual(
+                conversation.get_conversation(created["session_id"])["status"],
+                "waiting",
+            )
 
     def test_follow_up_to_assigned_staff_starts_fresh_response_timeout(self) -> None:
         conversations_dir = self.root / "conversations"

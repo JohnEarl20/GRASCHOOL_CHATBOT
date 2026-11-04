@@ -1,7 +1,7 @@
 {
   "meta": {
     "school": "GRA SCHOOL - Registrar's Office",
-    "term": "AY 2026-2027, First Semester",
+    "term": "AY 2026-2027, 2nd Semester",
     "status": "DRAFT",
     "warning": "Every record in this file is a team-written placeholder. Amounts, dates and hours are NOT taken from an announcement and MUST be verified against the actual handbook and posted announcements before the defense.",
     "source_note": "Sources are public pages, the handbook and posted announcements; each record below carries a 'source' field naming what it still needs.",
@@ -12,24 +12,47 @@
       "id": "freshman",
       "name": "Freshman",
       "label": "Freshman (new / first year student)",
-      "aliases": ["freshman", "freshmen", "first year", "new student", "bagong student"],
-      "rule_ids": ["R1", "R2"],
+      "aliases": [
+        "freshman",
+        "freshmen",
+        "first year",
+        "new student",
+        "bagong student"
+      ],
+      "rule_ids": [
+        "R1",
+        "R2"
+      ],
       "source": "DRAFT - confirm the freshman list in the handbook"
     },
     {
       "id": "transferee",
       "name": "Transferee",
       "label": "Transferee (student with a previous school)",
-      "aliases": ["transferee", "transferees", "transfer student"],
-      "rule_ids": ["R3", "R4"],
+      "aliases": [
+        "transferee",
+        "transferees",
+        "transfer student"
+      ],
+      "rule_ids": [
+        "R3",
+        "R4"
+      ],
       "source": "DRAFT - confirm the transferee list in the handbook"
     },
     {
       "id": "returning",
       "name": "Returning student",
       "label": "Returning student (re-enrolling)",
-      "aliases": ["returning", "returning student", "returnee", "old student"],
-      "rule_ids": ["R5"],
+      "aliases": [
+        "returning",
+        "returning student",
+        "returnee",
+        "old student"
+      ],
+      "rule_ids": [
+        "R5"
+      ],
       "source": "DRAFT - confirm the returning-student list in the handbook"
     }
   ],
@@ -37,7 +60,9 @@
     {
       "id": "form138",
       "name": "Form 138 (School Record)",
-      "applies_to": ["freshman"],
+      "applies_to": [
+        "freshman"
+      ],
       "issuing_body": "Registrar's Office",
       "description": "Official school record showing the subject and grade history of the student.",
       "source": "DRAFT - handbook section to be confirmed"
@@ -45,7 +70,9 @@
     {
       "id": "psa_birth_certificate",
       "name": "PSA Birth Certificate",
-      "applies_to": ["freshman"],
+      "applies_to": [
+        "freshman"
+      ],
       "issuing_body": "PSA (issued copy) or a Certified True Copy",
       "description": "Original PSA birth certificate issued by PSA, or a photocopy of the original plus a photocopy of the student's ID.",
       "source": "DRAFT - handbook section to be confirmed"
@@ -53,7 +80,9 @@
     {
       "id": "tor",
       "name": "TOR (Transcript of Records)",
-      "applies_to": ["transferee"],
+      "applies_to": [
+        "transferee"
+      ],
       "issuing_body": "Previous school / CHED",
       "description": "Transcript of Records with the original signature of the registrar, plus a copy of the transcript of grades if the school uses one.",
       "source": "DRAFT - handbook section to be confirmed"
@@ -61,7 +90,9 @@
     {
       "id": "honorable_dismissal",
       "name": "Honorable Dismissal",
-      "applies_to": ["transferee"],
+      "applies_to": [
+        "transferee"
+      ],
       "issuing_body": "Previous school registrar",
       "description": "Certificate of good moral character issued by the previous school, stating that the student left in good standing.",
       "source": "DRAFT - handbook section to be confirmed"
@@ -69,7 +100,9 @@
     {
       "id": "clearance",
       "name": "Clearance",
-      "applies_to": ["returning"],
+      "applies_to": [
+        "returning"
+      ],
       "issuing_body": "Guidance Office, Cashier's Office, Library",
       "description": "Signed clearance from the offices that hold the student's accountabilities (guidance, cashier, library).",
       "source": "DRAFT - handbook section to be confirmed"
@@ -79,7 +112,11 @@
     {
       "id": "enrollment",
       "name": "Official enrollment",
-      "needed_for": ["freshman", "transferee", "returning"],
+      "needed_for": [
+        "freshman",
+        "transferee",
+        "returning"
+      ],
       "provided_by": "registrar",
       "online_or_window": "window",
       "steps": [
@@ -94,7 +131,9 @@
     {
       "id": "clearance",
       "name": "Student clearance",
-      "needed_for": ["returning"],
+      "needed_for": [
+        "returning"
+      ],
       "provided_by": "guidance",
       "online_or_window": "window",
       "steps": [
@@ -109,7 +148,11 @@
     {
       "id": "payment",
       "name": "Payment of assessment fees",
-      "needed_for": ["freshman", "transferee", "returning"],
+      "needed_for": [
+        "freshman",
+        "transferee",
+        "returning"
+      ],
       "provided_by": "cashier",
       "online_or_window": "both",
       "steps": [
@@ -122,7 +165,11 @@
     {
       "id": "scholarship",
       "name": "Scholarship application",
-      "needed_for": ["freshman", "transferee", "returning"],
+      "needed_for": [
+        "freshman",
+        "transferee",
+        "returning"
+      ],
       "provided_by": "osa",
       "online_or_window": "window",
       "steps": [
@@ -135,7 +182,11 @@
     {
       "id": "late_enrollment",
       "name": "Late enrollment",
-      "needed_for": ["freshman", "transferee", "returning"],
+      "needed_for": [
+        "freshman",
+        "transferee",
+        "returning"
+      ],
       "provided_by": "registrar",
       "online_or_window": "window",
       "steps": [
@@ -153,7 +204,11 @@
       "location": "Main Building, Room 101",
       "hours": "Monday to Friday, 8:00 AM to 12:00 PM and 1:00 PM to 5:00 PM",
       "window": "Room 101",
-      "handles": ["enrollment", "assessment", "student records"],
+      "handles": [
+        "enrollment",
+        "assessment",
+        "student records"
+      ],
       "source": "DRAFT - hours to be confirmed against the posted schedule"
     },
     {
@@ -162,7 +217,10 @@
       "location": "Main Building, Room 105",
       "hours": "Monday to Friday, 8:00 AM to 3:00 PM",
       "window": "Room 105",
-      "handles": ["payment", "clearance"],
+      "handles": [
+        "payment",
+        "clearance"
+      ],
       "source": "DRAFT - hours to be confirmed against the posted schedule"
     },
     {
@@ -171,7 +229,10 @@
       "location": "Main Building, Room 203",
       "hours": "Monday to Friday, 9:00 AM to 4:00 PM",
       "window": "Room 203",
-      "handles": ["clearance", "scholarship"],
+      "handles": [
+        "clearance",
+        "scholarship"
+      ],
       "source": "DRAFT - hours to be confirmed against the posted schedule"
     },
     {
@@ -180,7 +241,9 @@
       "location": "Main Building, 2nd Floor",
       "hours": "Monday to Friday, 7:30 AM to 5:30 PM",
       "window": "2nd Floor",
-      "handles": ["clearance"],
+      "handles": [
+        "clearance"
+      ],
       "source": "DRAFT - hours to be confirmed against the posted schedule"
     },
     {
@@ -189,7 +252,10 @@
       "location": "Ground Floor, Student Center",
       "hours": "Monday to Friday, 8:00 AM to 5:00 PM",
       "window": "Student Center",
-      "handles": ["scholarship", "student activities"],
+      "handles": [
+        "scholarship",
+        "student activities"
+      ],
       "source": "DRAFT - hours to be confirmed against the posted schedule"
     }
   ],
@@ -200,7 +266,10 @@
       "units": 3,
       "prerequisites": [],
       "part_of": "BSCS",
-      "offered_in": ["1st semester", "2nd semester"],
+      "offered_in": [
+        "1st semester",
+        "2nd semester"
+      ],
       "laboratory": true,
       "source": "DRAFT - course catalogue entry to be confirmed"
     },
@@ -208,9 +277,14 @@
       "code": "CS 102",
       "title": "Programming 2",
       "units": 3,
-      "prerequisites": ["CS 101"],
+      "prerequisites": [
+        "CS 101"
+      ],
       "part_of": "BSCS",
-      "offered_in": ["1st semester", "2nd semester"],
+      "offered_in": [
+        "1st semester",
+        "2nd semester"
+      ],
       "laboratory": true,
       "source": "DRAFT - course catalogue entry to be confirmed"
     },
@@ -218,9 +292,14 @@
       "code": "CS 201",
       "title": "Data Structures and Algorithms",
       "units": 3,
-      "prerequisites": ["CS 102"],
+      "prerequisites": [
+        "CS 102"
+      ],
       "part_of": "BSCS",
-      "offered_in": ["1st semester", "2nd semester"],
+      "offered_in": [
+        "1st semester",
+        "2nd semester"
+      ],
       "laboratory": true,
       "source": "DRAFT - course catalogue entry to be confirmed"
     },
@@ -228,9 +307,13 @@
       "code": "CS 202",
       "title": "Discrete Structures",
       "units": 3,
-      "prerequisites": ["CS 101"],
+      "prerequisites": [
+        "CS 101"
+      ],
       "part_of": "BSCS",
-      "offered_in": ["2nd semester"],
+      "offered_in": [
+        "2nd semester"
+      ],
       "laboratory": false,
       "source": "DRAFT - course catalogue entry to be confirmed"
     },
@@ -240,7 +323,9 @@
       "units": 3,
       "prerequisites": [],
       "part_of": "BSCS",
-      "offered_in": ["2nd semester"],
+      "offered_in": [
+        "2nd semester"
+      ],
       "laboratory": true,
       "source": "DRAFT - elective offering to be confirmed"
     }
@@ -280,35 +365,55 @@
       "label": "Enrollment period (2nd semester)",
       "date": "2026-11-09 to 2026-11-20",
       "confirmed": false,
-      "applies_to": ["freshman", "transferee", "returning"],
+      "applies_to": [
+        "freshman",
+        "transferee",
+        "returning"
+      ],
       "source": "DRAFT - placeholder date, confirm against the posted announcement"
     },
     {
       "label": "Assessment payment deadline",
       "date": "2026-11-20",
       "confirmed": false,
-      "applies_to": ["freshman", "transferee", "returning"],
+      "applies_to": [
+        "freshman",
+        "transferee",
+        "returning"
+      ],
       "source": "DRAFT - placeholder date, confirm against the posted announcement"
     },
     {
       "label": "Classes start (2nd semester)",
       "date": "2026-11-23",
       "confirmed": false,
-      "applies_to": ["freshman", "transferee", "returning"],
+      "applies_to": [
+        "freshman",
+        "transferee",
+        "returning"
+      ],
       "source": "DRAFT - placeholder date, confirm against the posted announcement"
     },
     {
       "label": "Add / drop period closes",
       "date": "2026-11-30",
       "confirmed": false,
-      "applies_to": ["freshman", "transferee", "returning"],
+      "applies_to": [
+        "freshman",
+        "transferee",
+        "returning"
+      ],
       "source": "DRAFT - placeholder date, confirm against the posted announcement"
     },
     {
       "label": "Scholarship application deadline",
       "date": "2026-11-13",
       "confirmed": false,
-      "applies_to": ["freshman", "transferee", "returning"],
+      "applies_to": [
+        "freshman",
+        "transferee",
+        "returning"
+      ],
       "source": "DRAFT - placeholder date, confirm against the posted announcement"
     }
   ],
@@ -318,7 +423,10 @@
       "amount": 1500,
       "currency": "PHP",
       "confirmed": false,
-      "payment_options": ["full payment", "two installments (50% down on enrollment)"],
+      "payment_options": [
+        "full payment",
+        "two installments (50% down on enrollment)"
+      ],
       "source": "DRAFT - amount is a placeholder, confirm with the Cashier's Office"
     },
     {
@@ -326,7 +434,10 @@
       "amount": 1500,
       "currency": "PHP",
       "confirmed": false,
-      "payment_options": ["full payment", "two installments (50% down on enrollment)"],
+      "payment_options": [
+        "full payment",
+        "two installments (50% down on enrollment)"
+      ],
       "source": "DRAFT - amount is a placeholder, confirm with the Cashier's Office"
     },
     {
@@ -334,7 +445,9 @@
       "amount": 500,
       "currency": "PHP",
       "confirmed": false,
-      "payment_options": ["full payment"],
+      "payment_options": [
+        "full payment"
+      ],
       "source": "DRAFT - amount is a placeholder, confirm with the Cashier's Office"
     }
   ],

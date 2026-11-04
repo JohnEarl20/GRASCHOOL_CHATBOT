@@ -41,6 +41,8 @@ def generate_timeout_fallback(
         return None
     if conversation.staff_response_seconds_remaining(conv) != 0:
         return None
+    if conversation.get_available_staff():
+        return None
 
     last_question = next(
         (
