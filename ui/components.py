@@ -165,11 +165,18 @@ def hero(title: str, body: str) -> None:
     )
 
 
-def user_profile_card(name: str, role: str, online: bool = True) -> None:
+def user_profile_card(name: str, role: str, online: bool = True, profile_picture: str = "") -> None:
     """Futuristic User Profile Card matching the reference design."""
     avatar_svg = icon("user", 22, "#35D5FF")
     role_display = role.capitalize() if role else "Student"
     display_name = _esc(name or "User")
+    
+    # Build avatar HTML - use profile picture if available, otherwise gradient initial
+    if profile_picture and profile_picture.startswith("data:image/"):
+        avatar_html = f"<img src='{profile_picture}' alt='' style='width:100%;height:100%;border-radius:50%;object-fit:cover;'/>"
+    else:
+        avatar_html = f"<div class='cca-dev-initial' aria-hidden='true' style='width:100%;height:100%;display:grid;place-items:center;background:linear-gradient(135deg,rgba(10,114,234,0.5),rgba(0,191,255,0.5));border-radius:50%;'>{avatar_svg}</div>"
+    
     st.markdown(
         f"""
         <div style="
@@ -187,13 +194,13 @@ def user_profile_card(name: str, role: str, online: bool = True) -> None:
                 width: 40px;
                 height: 40px;
                 border-radius: 50%;
-                background: linear-gradient(135deg, rgba(10, 114, 234, 0.5), rgba(0, 191, 255, 0.5));
                 border: 1.5px solid #00BFFF;
                 display: grid;
                 place-items: center;
                 flex-shrink: 0;
+                overflow: hidden;
             ">
-                {avatar_svg}
+                {avatar_html}
             </div>
             <div style="overflow: hidden; flex: 1;">
                 <div style="font-weight: 700; color: #FFFFFF; font-size: 0.95rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">

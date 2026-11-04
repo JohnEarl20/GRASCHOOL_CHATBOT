@@ -394,6 +394,7 @@ def create_account(user_id: str, password: str, name: str = "", role: str = "stu
                 "name": name.strip() if isinstance(name, str) else "",
                 "role": "student",
                 "created_at": datetime.now().isoformat(timespec="seconds"),
+                "profile_picture": "",
             }
             _save_users(users)
     except AccountStoreError as error:
@@ -450,6 +451,7 @@ def create_staff_account(
                 "department": department,
                 "role": "staff",
                 "created_at": datetime.now().isoformat(timespec="seconds"),
+                "profile_picture": "",
             }
             _save_users(users)
     except AccountStoreError as error:
@@ -505,6 +507,56 @@ def logout(cookie_manager=None) -> None:
             secure=bool(os.environ.get("RENDER_SERVICE_ID")),
             same_site="lax",
         )
+
+
+def update_profile_picture(user_id: str, picture_data: str) -> tuple[bool, str]:
+    """Update the profile picture for a user.
+    
+    Args:
+        user_id: The user ID
+        picture_data: Base64 encoded image data (with data URI prefix)
+    
+    Returns:
+        Tuple of (success, message)
+    """
+    if not user_id:
+        return False, "User ID is required."
+    
+    try:
+        with _ACCOUNT_LOCK:
+            users = _load_users()
+            stored_id, account = _find_account(users, user_id)
+            if account is None:
+                return False, "User not found."
+            
+            # Validate it's a valid data URI
+            if picture_data and not picture_data.startswith("data:image/"):
+                return False, "Invalid image format. Must be a data URI."
+            
+            # Limit size to ~2MB (base64 encoded)
+            if picture_data and len(picture_data) > 2_500_000:
+                return False, "Image too large. Maximum size is 2MB."
+            
+            users[stored_id]["profile_picture"] = picture_data
+            _save_users(users)
+    except AccountStoreError as error:
+        return False, str(error)
+    return True, "Profile picture updated successfully."
+
+
+def get_profile_picture(user_id: str) -> str:
+    """Get the profile picture for a user.
+    
+    Returns:
+        Base64 encoded image data URI, or empty string if not set.
+    """
+    if not user_id:
+        return ""
+    users = _load_users()
+    _, account = _find_account(users, user_id)
+    if account:
+        return account.get("profile_picture", "")
+    return ""
 
 
 def create_session_token() -> str:

@@ -404,6 +404,7 @@ def render_sidebar(cookie_manager) -> None:
     user_name = auth.get_current_user_name()
     user_id = auth.get_current_user_id()
     user_role = auth.get_current_user_role()
+    profile_picture = auth.get_profile_picture(user_id) if logged_in and user_id else ""
     with st.sidebar:
         C.brand()
         if not auth.is_staff():
@@ -413,7 +414,7 @@ def render_sidebar(cookie_manager) -> None:
 
         # Auth section
         if logged_in:
-            C.user_profile_card(user_name or user_id, user_role, online=True)
+            C.user_profile_card(user_name or user_id, user_role, online=True, profile_picture=profile_picture)
             if st.button("Logout", key="logout", width="stretch"):
                 auth.logout(cookie_manager)
                 st.session_state["auth_cookie_cleared"] = True

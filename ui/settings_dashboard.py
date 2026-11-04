@@ -555,6 +555,56 @@ def render_advanced_settings(
                         st.error("Incorrect current password.")
 
             st.divider()
+            st.markdown("##### Profile Picture")
+            current_uid = auth.get_current_user_id()
+            current_picture = auth.get_profile_picture(current_uid) if current_uid else ""
+            
+            if current_picture:
+                st.markdown("**Current Profile Picture:**")
+                st.image(current_picture, width=120)
+                st.caption("Upload a new picture to replace it.")
+            
+            uploaded_file = st.file_uploader(
+                "Upload Profile Picture",
+                type=["png", "jpg", "jpeg", "webp"],
+                key="profile_picture_upload",
+                help="Maximum file size: 2MB. Supported formats: PNG, JPG, JPEG, WebP."
+            )
+            
+            if uploaded_file is not None:
+                # Preview the uploaded image
+                file_bytes = uploaded_file.getvalue()
+                if len(file_bytes) > 2_000_000:
+                    st.error("File too large. Maximum size is 2MB.")
+                else:
+                    import base64
+                    mime_type = uploaded_file.type or "image/png"
+                    b64_data = base64.b64encode(file_bytes).decode("utf-8")
+                    data_uri = f"data:{mime_type};base64,{b64_data}"
+                    
+                    st.markdown("**Preview:**")
+                    st.image(data_uri, width=120)
+                    
+                    if st.button("Save Profile Picture", key="save_profile_pic_btn", type="primary"):
+                        success, message = auth.update_profile_picture(current_uid, data_uri)
+                        if success:
+                            log_audit_fn("Updated profile picture", current_user_name)
+                            st.success(f"✅ {message}")
+                            st.rerun()
+                        else:
+                            st.error(message)
+            
+            if current_picture:
+                if st.button("Remove Profile Picture", key="remove_profile_pic_btn"):
+                    success, message = auth.update_profile_picture(current_uid, "")
+                    if success:
+                        log_audit_fn("Removed profile picture", current_user_name)
+                        st.success(f"✅ {message}")
+                        st.rerun()
+                    else:
+                        st.error(message)
+
+            st.divider()
             st.markdown("##### Session & Authentication Policies")
             col_s1, col_s2 = st.columns(2)
             with col_s1:
