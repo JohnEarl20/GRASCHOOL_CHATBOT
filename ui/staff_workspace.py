@@ -163,6 +163,12 @@ def _question_review_rows(
         if conversations is None
         else conversations
     )
+    # Defence in depth: never surface a conversation whose session was deleted,
+    # even if its file is still on disk.
+    conversation_rows = [
+        conv for conv in conversation_rows
+        if str(conv.get("session_id", "")) not in deleted_sessions
+    ]
 
     logs_by_question: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for row in logs:

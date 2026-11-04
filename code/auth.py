@@ -15,7 +15,7 @@ import re
 import secrets
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import psycopg
@@ -486,10 +486,25 @@ def login(user_id: str, password: str, expected_role: str | None = None) -> tupl
     return True, f"Welcome, {account.get('name', user_id)}"
 
 
-def logout() -> None:
-    """Log out the current user."""
+def logout(cookie_manager=None) -> None:
+    """Log out the current user.
+
+    Clears the session state *and* the browser login cookie so that a page
+    refresh cannot restore the login through ``restore_session_token``.
+    """
     for key in (SESSION_KEY, SESSION_ROLE_KEY):
         st.session_state.pop(key, None)
+    if cookie_manager is not None:
+        cookie_manager.set(
+            SESSION_COOKIE_NAME,
+            "",
+            key="logout_auth_session",
+            path="/",
+            expires_at=datetime.now() - timedelta(seconds=1),
+            max_age=0,
+            secure=bool(os.environ.get("RENDER_SERVICE_ID")),
+            same_site="lax",
+        )
 
 
 def create_session_token() -> str:

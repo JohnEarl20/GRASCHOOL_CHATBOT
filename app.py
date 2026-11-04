@@ -415,10 +415,9 @@ def render_sidebar(cookie_manager) -> None:
         if logged_in:
             C.user_profile_card(user_name or user_id, user_role, online=True)
             if st.button("Logout", key="logout", width="stretch"):
-                auth.logout()
+                auth.logout(cookie_manager)
                 st.session_state["auth_cookie_cleared"] = True
                 st.session_state.pop("auth_cookie_initialized", None)
-                _delete_browser_login(cookie_manager, "logout_auth_session")
                 st.session_state.view = "login"
                 st.query_params["view"] = "login"
                 st.rerun()
