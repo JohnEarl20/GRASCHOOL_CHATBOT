@@ -1210,13 +1210,24 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
             })
 
             self.assertTrue(conversation.delete_own_conversation(own["session_id"]))
-            self.assertIsNone(conversation.get_conversation(own["session_id"]))
+            # Soft-delete: conversation remains on disk with deleted_by_student status
+            deleted_conv = conversation.get_conversation(own["session_id"])
+            self.assertIsNotNone(deleted_conv)
+            self.assertEqual(deleted_conv["status"], "deleted_by_student")
             self.assertIsNotNone(conversation.get_conversation(other["session_id"]))
+            # Logs are preserved for staff records
             self.assertEqual(
-                [row["session_id"] for row in logger.read_logs()],
-                [other["session_id"]],
+                sorted(row["session_id"] for row in logger.read_logs()),
+                sorted([own["session_id"], other["session_id"]]),
             )
-            self.assertIn(own["session_id"], logger.deleted_session_ids())
+            # Soft-delete does not mark the session in deleted_session_ids
+            self.assertNotIn(own["session_id"], logger.deleted_session_ids())
+            # Hidden from the student's own conversation list
+            student_convs = conversation.get_student_conversations("student-1")
+            self.assertNotIn(
+                own["session_id"],
+                [c["session_id"] for c in student_convs],
+            )
             with self.assertRaises(PermissionError):
                 conversation.delete_own_conversation(other["session_id"])
 

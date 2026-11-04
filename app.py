@@ -536,8 +536,9 @@ def render_sidebar(cookie_manager) -> None:
 
                     if st.session_state.get(f"confirm_student_delete_{session_id}", False):
                         st.warning(
-                            f"Delete this {status.lower()} conversation permanently? "
-                            "Its messages and inquiry records will be removed."
+                            f"Hide this {status.lower()} conversation from your list? "
+                            "It will be removed from your Recent conversations but "
+                            "kept for staff records."
                         )
                         confirm_col, cancel_col = st.columns(2, gap="small")
                         with confirm_col:

@@ -181,6 +181,13 @@ def _question_review_rows(
         row for row in log_rows
         if row.get("event") != "feedback" and row.get("intent") != "voice_recording"
     ]
+    logs = _questions() if log_rows is None else [
+        row for row in log_rows
+        if row.get("event") != "feedback" and row.get("intent") != "voice_recording"
+    ]
+    # Staff hard-delete still marks sessions as deleted; keep those log rows
+    # out of Question Review. Student-initiated deletions are soft-deletes and
+    # never touch deleted_session_ids, so their records stay visible.
     deleted_sessions = logger.deleted_session_ids()
     logs = [
         row for row in logs
@@ -192,12 +199,6 @@ def _question_review_rows(
         if conversations is None
         else conversations
     )
-    # Defence in depth: never surface a conversation whose session was deleted,
-    # even if its file is still on disk.
-    conversation_rows = [
-        conv for conv in conversation_rows
-        if str(conv.get("session_id", "")) not in deleted_sessions
-    ]
 
     logs_by_question: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for row in logs:

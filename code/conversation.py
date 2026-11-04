@@ -129,7 +129,11 @@ def delete_conversation(session_id: str) -> bool:
 
 
 def delete_own_conversation(session_id: str) -> bool:
-    """Allow a student to permanently delete only their own conversation."""
+    """Mark a conversation as deleted by the student.
+
+    The conversation is hidden from the student's Recent conversations list
+    but remains on disk so staff can still see it for records.
+    """
     from code import auth
 
     if not auth.is_student():
@@ -140,7 +144,12 @@ def delete_own_conversation(session_id: str) -> bool:
     conv = _load_conversation(session_id)
     if not student_id or not conv or conv.get("student_id") != student_id:
         raise PermissionError("You can only delete your own conversations.")
-    return _permanently_delete_conversation(session_id)
+    if conv.get("status") == "deleted_by_student":
+        return True  # Already deleted by the student
+    conv["status"] = "deleted_by_student"
+    conv["updated_at"] = datetime.now().isoformat(timespec="microseconds")
+    _save_conversation(conv)
+    return True
 
 
 def _permanently_delete_conversation(session_id: str) -> bool:
@@ -188,7 +197,11 @@ def get_student_conversation(student_id: str) -> dict | None:
 
 
 def get_student_conversations(student_id: str) -> list[dict]:
-    """Get conversation history for one student, newest first."""
+    """Get conversation history for one student, newest first.
+
+    Conversations marked ``deleted_by_student`` are hidden from the
+    student's own list but remain visible to staff for records.
+    """
     if not student_id:
         return []
     _ensure_dir()
@@ -200,6 +213,11 @@ def get_student_conversations(student_id: str) -> list[dict]:
                 conversations.append(conv)
         except (json.JSONDecodeError, OSError):
             continue
+    # Hide student-deleted conversations from the student's own list.
+    conversations = [
+        c for c in conversations
+        if c.get("status") != "deleted_by_student"
+    ]
     conversations.sort(key=lambda conv: conv.get("updated_at", ""), reverse=True)
     return conversations
 
