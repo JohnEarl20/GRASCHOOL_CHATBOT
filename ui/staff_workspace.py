@@ -70,7 +70,36 @@ def render_staff_management(audit_fn: Callable[[str, str], None]) -> None:
         with email_col:
             official_email = st.text_input("Official Email", max_chars=254)
         with department_col:
-            department = st.text_input("Department", max_chars=100)
+            department_options = [
+                "Administration",
+                "Registrar's Office",
+                "Admissions",
+                "Finance & Accounting",
+                "Student Affairs",
+                "Guidance & Counseling",
+                "Academic Affairs",
+                "Library",
+                "Information Technology",
+                "Human Resources",
+                "Maintenance & Facilities",
+                "Security",
+                "Clinic / Medical Services",
+                "Alumni Relations",
+                "Other...",
+            ]
+            department_choice = st.selectbox(
+                "Department",
+                department_options,
+                key="staff_department_select",
+            )
+            if department_choice == "Other...":
+                department = st.text_input(
+                    "Specify Department",
+                    max_chars=100,
+                    key="staff_department_other",
+                )
+            else:
+                department = department_choice
 
         password_col, confirm_col = st.columns(2)
         with password_col:
