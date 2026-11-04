@@ -608,9 +608,13 @@ def render_sidebar(cookie_manager) -> None:
             st.markdown(f"**Assessment fees:** {'paid' if session.fees_paid else 'not paid'}")
 
         if st.button("Start over", key="reset_session", width="stretch"):
-            st.session_state.session = dialogue.new_session()
-            st.session_state.messages = []
-            st.rerun()
+            if logged_in and auth.is_student() and user_id:
+                _start_new_student_chat(user_id, user_name)
+            else:
+                st.session_state.session = dialogue.new_session()
+                st.session_state.messages = []
+                st.session_state.conversation_id = None
+                st.rerun()
 
         st.divider()
         # Utility views live below the staff entry, never in the main navigation.
