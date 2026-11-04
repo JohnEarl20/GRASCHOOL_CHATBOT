@@ -931,20 +931,30 @@ def render_chat() -> None:
                     st.rerun()
 
     # Render all messages from conversation
+    # Get profile pictures
+    student_profile_pic = auth.get_profile_picture(student_id) if student_id else ""
+    # Get assigned staff profile picture if available
+    assigned_staff_id = current_conversation.get("assigned_staff") if current_conversation else None
+    assigned_staff_profile_pic = auth.get_profile_picture(assigned_staff_id) if assigned_staff_id else ""
+    
     for index, message in enumerate(st.session_state.messages):
         role = message.get("role", "assistant")
         if role in {"user", "student"}:
-            with st.chat_message("user"):
+            with st.chat_message("user", avatar=student_profile_pic or "👤"):
                 C.user_bubble(message["text"], message.get("timestamp", "")[:5] if message.get("timestamp") else "")
                 if message.get("audio"):
                     st.audio(message["audio"], format="audio/wav")
         elif role == "staff":
-            with st.chat_message("assistant", avatar="👨‍💼"):
+            # Use the message's sender_name to find their profile picture
+            sender_name = message.get("sender_name", "")
+            sender_id = message.get("sender_id", "")
+            staff_pic = auth.get_profile_picture(sender_id) if sender_id else assigned_staff_profile_pic
+            with st.chat_message("assistant", avatar=staff_pic or "👨‍💼"):
                 st.markdown(f"**Staff:** {message['text']}")
                 if message.get("timestamp"):
                     st.caption(f"Sent at {message['timestamp'][:19].replace('T', ' ')}")
         else:  # assistant
-            with st.chat_message("assistant"):
+            with st.chat_message("assistant", avatar="🤖"):
                 C.bot_bubble(message["text"])
                 if message.get("meta") and message["meta"].get("intent") != "voice_recording":
                     _render_answer_meta(index, message)
@@ -1556,6 +1566,11 @@ def _render_staff_chat() -> None:
     # Chat messages
     st.markdown("##### Conversation")
     
+    # Get profile pictures
+    student_id = conv.get("student_id", "")
+    student_profile_pic = auth.get_profile_picture(student_id) if student_id else ""
+    staff_profile_pic = auth.get_profile_picture(staff_id) if staff_id else ""
+    
     # Display messages
     for msg in conv.get("messages", []):
         role = msg.get("role", "assistant")
@@ -1565,13 +1580,13 @@ def _render_staff_chat() -> None:
         meta = msg.get("meta", {})
         
         if role == "student":
-            with st.chat_message("user"):
+            with st.chat_message("user", avatar=student_profile_pic or "👤"):
                 st.markdown(f"**{sender_name or 'Student'}**")
                 st.markdown(text)
                 if timestamp:
                     st.caption(timestamp[:19].replace('T', ' '))
         elif role == "staff":
-            with st.chat_message("assistant", avatar="👨‍💼"):
+            with st.chat_message("assistant", avatar=staff_profile_pic or "👨‍💼"):
                 st.markdown(f"**Staff: {sender_name or staff_name}**")
                 st.markdown(text)
                 if timestamp:
