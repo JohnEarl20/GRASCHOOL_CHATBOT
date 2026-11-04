@@ -104,6 +104,13 @@ def create_conversation(
         "assigned_staff": None,
     }
     _save_conversation(conv)
+    from code import logger
+
+    try:
+        logger.clear_session_deleted(session_id)
+    except OSError:
+        _conv_path(session_id).unlink(missing_ok=True)
+        raise
     return conv
 
 
@@ -150,11 +157,21 @@ def _permanently_delete_conversation(session_id: str) -> bool:
         os.replace(path, deleting_path)
         from code import logger
 
+        logger.mark_session_deleted(session_id)
         logger.delete_session_logs(session_id)
         deleting_path.unlink()
-    except OSError:
+    except OSError as error:
         if deleting_path.exists() and not path.exists():
             os.replace(deleting_path, path)
+        try:
+            from code import logger
+
+            logger.clear_session_deleted(session_id)
+        except OSError as rollback_error:
+            raise OSError(
+                f"{error} The conversation was restored, but its review exclusion "
+                f"could not be cleared: {rollback_error}"
+            ) from error
         raise
     return True
 

@@ -241,7 +241,7 @@ User Query (English / Filipino / Taglish)
    - Analytics & Reports provides period, date, category, status, and staff filters with inquiry trends, category and status charts, weekday activity, KPI comparisons, searchable inquiry records, and activity-based recommendations.
    - Staff can generate and preview inquiry, AI performance, unanswered, category, staff activity, semester, and operations reports, then download CSV, Excel, or PDF and print the page.
    - Generated report files and the last 100 report-history entries are stored locally under `data/staff_reports/`, excluded from Git, and report creation is audit-logged.
-   - Question Review refreshes every two seconds with student questions from the chat log and conversation messages, including AI-answered and staff-routed messages; overlapping entries are deduplicated, and staff can label questions and explicitly retrain the intent model.
+   - Question Review refreshes every two seconds with student questions from the chat log and conversation messages, including AI-answered and staff-routed messages; overlapping entries are deduplicated, deleted conversations stay excluded from review, and staff can label questions and explicitly retrain the intent model.
    - Staff-approved knowledge articles are stored locally and are the only newly authored articles used by the assistant.
    - Staff documents and announcements use local file/JSON storage; published announcements appear in the student assistant.
    - Verified accuracy and response-time metrics are reported only when corresponding evaluation/timing records exist. The dashboard uses local log and conversation files rather than an analytics API; optional PostgreSQL storage is for student/staff accounts only.

@@ -416,7 +416,7 @@ Pindutin ang **Staff Dashboard** sa sidebar (o `?view=dashboard&role=Staff`). Di
 4. **Recommendation** — kung kailan mag-staff ng mas marami, may ebidensya at confidence
 5. **Unanswered questions** — search box, table, at labeling controls
 6. **Feedback** — helpful vs not helpful
-7. **Question Review** — bagong tanong mula sa chat log at conversation messages ay kusang lumalabas kada 2 segundo, kasama ang nasagot na ng AI at ipinasa sa staff. Tinatanggal ang magkakaparehong entry; puwedeng lagyan ng staff label at manu-manong i-retrain ang intent model.
+7. **Question Review** — bagong tanong mula sa chat log at conversation messages ay kusang lumalabas kada 2 segundo, kasama ang nasagot na ng AI at ipinasa sa staff. Tinatanggal ang magkakaparehong entry, at hindi na ipinapakita ang mga tanong mula sa binurang conversation; puwedeng lagyan ng staff label at manu-manong i-retrain ang intent model.
 
 **⚠️ Ang data dito ay SAMPLE LANG** — synthetic, galing sa `scripts/seed_sample_logs.py`. Sinasabi ito ng dashboard mismo sa dilaw na babala.
 

@@ -9,11 +9,38 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LOG_PATH = ROOT / "data" / "chat_log.jsonl"
+DELETED_SESSIONS_DIR = ROOT / "data" / "deleted_conversations"
+
+
+def deleted_session_ids() -> set[str]:
+    """Return conversation IDs that must stay hidden from Question Review."""
+    if not DELETED_SESSIONS_DIR.exists():
+        return set()
+    return {
+        path.stem
+        for path in DELETED_SESSIONS_DIR.glob("*.deleted")
+        if path.is_file()
+    }
+
+
+def mark_session_deleted(session_id: str) -> None:
+    if not isinstance(session_id, str) or not re.fullmatch(r"[a-f0-9]{12}", session_id):
+        raise ValueError("Invalid conversation ID.")
+    DELETED_SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+    (DELETED_SESSIONS_DIR / f"{session_id}.deleted").touch(exist_ok=True)
+
+
+def clear_session_deleted(session_id: str) -> None:
+    if not isinstance(session_id, str) or not re.fullmatch(r"[a-f0-9]{12}", session_id):
+        raise ValueError("Invalid conversation ID.")
+    marker = DELETED_SESSIONS_DIR / f"{session_id}.deleted"
+    marker.unlink(missing_ok=True)
 
 
 def log_turn(record: dict) -> None:

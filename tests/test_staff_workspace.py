@@ -1090,9 +1090,11 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
     def test_staff_can_permanently_delete_one_conversation_and_its_log_rows(self) -> None:
         conversations_dir = self.root / "conversations"
         log_path = self.root / "chat_log.jsonl"
+        deleted_sessions_dir = self.root / "deleted_conversations"
         with (
             patch.object(conversation, "CONV_DIR", conversations_dir),
             patch.object(logger, "LOG_PATH", log_path),
+            patch.object(logger, "DELETED_SESSIONS_DIR", deleted_sessions_dir),
             patch.object(auth, "is_staff", return_value=True),
         ):
             target = self._create_for_student("student-1", "Student One")
@@ -1115,6 +1117,18 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
             self.assertEqual(len(remaining_logs), 1)
             self.assertEqual(remaining_logs[0]["session_id"], retained["session_id"])
 
+            logger.log_turn({
+                "session_id": target["session_id"],
+                "student_id": "student-1",
+                "text": "Stale question from deleted conversation",
+            })
+            review_rows = staff_workspace._question_review_rows()
+            self.assertNotIn(
+                "Stale question from deleted conversation",
+                [row["text"] for row in review_rows],
+            )
+            self.assertIn("Keep this inquiry", [row["text"] for row in review_rows])
+
     def test_only_staff_can_permanently_delete_conversations(self) -> None:
         conversations_dir = self.root / "conversations"
         with (
@@ -1129,9 +1143,11 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
     def test_student_can_permanently_delete_only_their_own_conversation(self) -> None:
         conversations_dir = self.root / "conversations"
         log_path = self.root / "chat_log.jsonl"
+        deleted_sessions_dir = self.root / "deleted_conversations"
         with (
             patch.object(conversation, "CONV_DIR", conversations_dir),
             patch.object(logger, "LOG_PATH", log_path),
+            patch.object(logger, "DELETED_SESSIONS_DIR", deleted_sessions_dir),
             patch.object(auth, "is_student", return_value=True),
             patch.object(auth, "get_current_user_id", return_value="student-1"),
         ):
@@ -1155,6 +1171,7 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
                 [row["session_id"] for row in logger.read_logs()],
                 [other["session_id"]],
             )
+            self.assertIn(own["session_id"], logger.deleted_session_ids())
             with self.assertRaises(PermissionError):
                 conversation.delete_own_conversation(other["session_id"])
 

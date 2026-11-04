@@ -20,6 +20,7 @@ data/chat_log.jsonl
 data/harvested_chat_queries.csv
 data/staff_labeled_queries.csv
 data/conversations/
+data/deleted_conversations/
 data/backups/
 data/staff_presence.json
 data/app_prefs.json

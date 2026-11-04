@@ -152,6 +152,11 @@ def _question_review_rows(
         row for row in log_rows
         if row.get("event") != "feedback" and row.get("intent") != "voice_recording"
     ]
+    deleted_sessions = logger.deleted_session_ids()
+    logs = [
+        row for row in logs
+        if str(row.get("session_id", "")) not in deleted_sessions
+    ]
     logs.sort(key=lambda row: str(row.get("ts", "")), reverse=True)
     conversation_rows = (
         conversation.get_all_conversations()
