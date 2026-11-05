@@ -100,6 +100,21 @@ def set_article_status(article_id: str, status: str, staff_id: str) -> dict[str,
     return record
 
 
+def delete_article(article_id: str, staff_id: str) -> bool:
+    """Permanently delete a knowledge article."""
+    if not re.fullmatch(r"[a-f0-9]{32}", article_id):
+        raise ValueError("Invalid article reference.")
+    records = load_articles()
+    record = next((row for row in records if row.get("id") == article_id), None)
+    if record is None:
+        return False
+    _write_records(
+        ARTICLES_PATH,
+        [row for row in records if row.get("id") != article_id],
+    )
+    return True
+
+
 def load_announcements() -> list[dict[str, Any]]:
     return _read_records(ANNOUNCEMENTS_PATH)
 

@@ -1690,6 +1690,130 @@ def render_knowledge_base(audit_fn: Callable[[str, str], None]) -> None:
                 audit_fn("Archived a knowledge article", auth.get_current_user_name() or auth.get_current_user_id() or "staff")
                 st.success("Article archived.")
                 st.rerun()
+
+    st.markdown("### All knowledge articles")
+    st.caption(
+        "Published and AI-verified articles are visible to students. "
+        "Archived articles are hidden from students."
+    )
+    records = staff_content.load_articles()
+    if records:
+        table_rows = []
+        for row in records:
+            status = row.get("status", "draft")
+            published = status in {"published", "approved"}
+            status_label = {
+                "draft": "Draft",
+                "published": "Published",
+                "approved": "AI-verified",
+                "archived": "Archived",
+            }.get(status, status)
+            table_rows.append({
+                "Title": row.get("title", "Untitled"),
+                "Category": row.get("category", ""),
+                "Status": status_label,
+                "Published to students": "Yes" if published else "No",
+                "Updated": str(row.get("updated_at", ""))[:10],
+            })
+        st.dataframe(pd.DataFrame(table_rows), width="stretch", hide_index=True)
+
+        st.markdown("---")
+        st.markdown("### Manage each article")
+        for row in records:
+            article_id = str(row.get("id", ""))
+            status = row.get("status", "draft")
+            title = row.get("title", "Untitled")
+            published = status in {"published", "approved"}
+
+            with st.container(border=True):
+                left, middle, right = st.columns([3, 1, 1])
+                with left:
+                    st.markdown(f"**{html.escape(title)}**")
+                    st.caption(
+                        f"Status: {status} · Category: {row.get('category', '')} · "
+                        f"Updated: {str(row.get('updated_at', ''))[:10]}"
+                    )
+                with middle:
+                    if published:
+                        if st.button(
+                            "Unpublish",
+                            key=f"staff_article_unpublish_{article_id}",
+                            help="Move back to draft so students can no longer see it",
+                        ):
+                            try:
+                                staff_content.set_article_status(
+                                    article_id, "draft", auth.get_current_user_id() or ""
+                                )
+                            except (OSError, ValueError) as error:
+                                st.error(f"Could not unpublish the article: {error}")
+                            else:
+                                audit_fn("Unpublished a knowledge article", auth.get_current_user_name() or auth.get_current_user_id() or "staff")
+                                st.success("Article moved to draft.")
+                                st.rerun()
+                    else:
+                        if st.button(
+                            "Publish",
+                            key=f"staff_article_publish_{article_id}",
+                            help="Publish so students can see it",
+                        ):
+                            try:
+                                staff_content.set_article_status(
+                                    article_id, "published", auth.get_current_user_id() or ""
+                                )
+                            except (OSError, ValueError) as error:
+                                st.error(f"Could not publish the article: {error}")
+                            else:
+                                audit_fn("Published a knowledge article", auth.get_current_user_name() or auth.get_current_user_id() or "staff")
+                                st.success("Article published and available to students.")
+                                st.rerun()
+                with right:
+                    confirmation_key = f"confirm_delete_article_{article_id}"
+                    if st.session_state.get(confirmation_key):
+                        st.error(f"Delete **{html.escape(title)}** permanently?")
+                        confirm_col, cancel_col = st.columns(2)
+                        with confirm_col:
+                            if st.button(
+                                "Delete permanently",
+                                key=f"staff_article_delete_yes_{article_id}",
+                                type="primary",
+                                width="stretch",
+                            ):
+                                try:
+                                    deleted = staff_content.delete_article(
+                                        article_id, auth.get_current_user_id() or ""
+                                    )
+                                except (OSError, ValueError) as error:
+                                    st.error(f"Could not delete the article: {error}")
+                                else:
+                                    if deleted:
+                                        audit_fn(
+                                            "Deleted a knowledge article",
+                                            auth.get_current_user_name() or auth.get_current_user_id() or "staff",
+                                        )
+                                        st.session_state.pop(confirmation_key, None)
+                                        st.success("Article deleted permanently.")
+                                        st.rerun()
+                                    else:
+                                        st.error("This article no longer exists.")
+                        with cancel_col:
+                            if st.button(
+                                "Cancel",
+                                key=f"staff_article_delete_no_{article_id}",
+                                width="stretch",
+                            ):
+                                st.session_state.pop(confirmation_key, None)
+                                st.rerun()
+                    else:
+                        if st.button(
+                            "Delete",
+                            key=f"staff_article_delete_{article_id}",
+                            type="secondary",
+                            width="stretch",
+                        ):
+                            st.session_state[confirmation_key] = True
+                            st.rerun()
+    else:
+        st.info("No knowledge articles have been created yet.")
     st.markdown("### School ontology")
     st.caption("Existing official records stay in data/ontology.json and remain available to the assistant.")
     ontology = knowledge.load()
