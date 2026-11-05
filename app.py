@@ -323,7 +323,7 @@ def _render_student_document_preview(record: dict, content: bytes) -> None:
             frame = pd.read_csv(io.BytesIO(content), nrows=100)
             st.dataframe(frame, width="stretch")
         elif suffix in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}:
-            st.image(content)
+            st.image(io.BytesIO(content), caption=record.get("filename", "Document"))
         elif suffix == ".pdf":
             encoded = base64.b64encode(content).decode("ascii")
             st.components.v1.html(

@@ -206,9 +206,9 @@ def save_document(
     original_name = Path(filename).name
     extension = Path(original_name).suffix.lower()
     _validate_document_content(content)
-    category = category.strip()
-    if not category or len(category) > 80:
-        raise ValueError("Document category is required and must be 80 characters or fewer.")
+    category = category.strip() or "General"
+    if len(category) > 80:
+        raise ValueError("Document category must be 80 characters or fewer.")
 
     document_id = uuid.uuid4().hex
     stored_name = f"{document_id}{extension}"
@@ -243,9 +243,9 @@ def replace_document(
     original_name = Path(filename).name
     extension = Path(original_name).suffix.lower()
     _validate_document_content(content)
-    category = category.strip()
-    if not category or len(category) > 80:
-        raise ValueError("Document category is required and must be 80 characters or fewer.")
+    category = category.strip() or "General"
+    if len(category) > 80:
+        raise ValueError("Document category must be 80 characters or fewer.")
 
     records = load_documents()
     record = next((row for row in records if row.get("id") == document_id), None)

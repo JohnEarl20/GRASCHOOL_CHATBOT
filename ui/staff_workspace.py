@@ -1733,7 +1733,7 @@ def render_documents(audit_fn: Callable[[str, str], None]) -> None:
     ]
     with st.form("staff_document_upload", clear_on_submit=True):
         upload = st.file_uploader("Choose a supporting document")
-        category = st.text_input("Category", max_chars=80, placeholder="For example: Enrollment")
+        category = st.text_input("Category", max_chars=80, placeholder="For example: Enrollment", help="Optional. Defaults to General if left blank.")
         selected_students = st.multiselect(
             "Share with student(s)",
             options=list(student_options),
