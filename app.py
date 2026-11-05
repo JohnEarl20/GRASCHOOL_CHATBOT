@@ -69,9 +69,8 @@ INTENT_LABELS = {
 
 NAV = [
     ("chat", "AI Assistant", "bot"),
-    ("student_announcements", "School Announcements", "megaphone"),
+    ("student_knowledge_announcements", "Knowledge & Announcements", "book"),
     ("student_documents", "Shared Documents", "upload"),
-    ("student_knowledge", "Knowledge Base", "book"),
 ]
 
 # Auth views (shown in sidebar based on login state)
@@ -2017,11 +2016,27 @@ def render_settings() -> None:
     )
 
 
-def render_student_announcements() -> None:
+def render_student_knowledge_announcements() -> None:
     if not auth.is_student():
         st.error("This page is available to student accounts only.")
         return
+
+    area = st.radio(
+        "Workspace",
+        ["School Announcements", "Knowledge Base"],
+        horizontal=True,
+        key="student_knowledge_announcements_area",
+        label_visibility="collapsed",
+    )
+    if area == "School Announcements":
+        _render_student_announcements_only()
+    else:
+        _render_student_knowledge_only()
+
+
+def _render_student_announcements_only() -> None:
     st.markdown("## School Announcements")
+    st.caption("Official school announcements published by staff.")
     today = datetime.now().date().isoformat()
     try:
         announcements = [
@@ -2048,10 +2063,7 @@ def render_student_announcements() -> None:
                 st.caption(f"Published {item['publish_on']}")
 
 
-def render_student_knowledge() -> None:
-    if not auth.is_student():
-        st.error("This page is available to student accounts only.")
-        return
+def _render_student_knowledge_only() -> None:
     st.markdown("## Knowledge Base")
     st.caption("Official school information approved for student access.")
     try:
@@ -2328,12 +2340,10 @@ def main() -> None:
 
     if view == "chat":
         render_chat()
-    elif view == "student_announcements":
-        render_student_announcements()
+    elif view == "student_knowledge_announcements":
+        render_student_knowledge_announcements()
     elif view == "student_documents":
         render_student_documents()
-    elif view == "student_knowledge":
-        render_student_knowledge()
     elif view == "voice":
         render_voice()
     elif view == "login":
