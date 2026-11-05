@@ -14,6 +14,7 @@ are checked against the authenticated staff role before rendering.
 """
 from __future__ import annotations
 
+import base64
 import html
 import json
 import os
@@ -309,6 +310,37 @@ def profile() -> dict | None:
 # --------------------------------------------------------------------------
 # Sidebar
 # --------------------------------------------------------------------------
+def _render_student_document_preview(record: dict, content: bytes) -> None:
+    """Inline preview of a shared document, with a graceful fallback by type."""
+    suffix = Path(record.get("filename", "")).suffix.lower()
+    try:
+        if suffix == ".txt":
+            text = content.decode("utf-8", errors="replace")
+            st.text(text[:8000])
+            if len(text) > 8000:
+                st.caption("Showing the first 8,000 characters.")
+        elif suffix == ".csv":
+            frame = pd.read_csv(io.BytesIO(content), nrows=100)
+            st.dataframe(frame, width="stretch")
+        elif suffix in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}:
+            st.image(content)
+        elif suffix == ".pdf":
+            encoded = base64.b64encode(content).decode("ascii")
+            st.components.v1.html(
+                f'<iframe src="data:application/pdf;base64,{encoded}" '
+                'width="100%" height="600" type="application/pdf"></iframe>',
+                height=620,
+                scrolling=True,
+            )
+        else:
+            st.info(
+                "Preview is not available for this file type. "
+                "Download the file to open it."
+            )
+    except Exception as error:
+        st.warning(f"Could not generate a preview: {error}")
+
+
 def _render_student_shared_documents(student_id: str) -> None:
     st.markdown("## Shared Documents")
     st.caption("Documents shared with your account by school staff.")
@@ -341,13 +373,14 @@ def _render_student_shared_documents(student_id: str) -> None:
             st.error(f"Could not open a shared document: {error}")
             continue
         document_id = str(record.get("id", ""))
+        suffix = Path(record.get("filename", "")).suffix.lower()
         download_col, remove_col = st.columns([4, 1], gap="small")
         with download_col:
             st.download_button(
                 f"Download · {record.get('filename', 'Document')}",
                 data=content,
                 file_name=record.get("filename", "document"),
-                mime=mime_types.get(Path(record.get("filename", "")).suffix.lower(), "application/octet-stream"),
+                mime=mime_types.get(suffix, "application/octet-stream"),
                 key=f"student_shared_document_{document_id}",
                 width="stretch",
             )
@@ -360,6 +393,8 @@ def _render_student_shared_documents(student_id: str) -> None:
                 st.session_state[f"confirm_remove_shared_document_{document_id}"] = True
                 st.rerun()
         st.caption(f"{record.get('category', 'School document')} · {record.get('uploaded_at', '')[:10]}")
+        with st.expander(f"View · {record.get('filename', 'Document')}"):
+            _render_student_document_preview(record, content)
         confirmation_key = f"confirm_remove_shared_document_{document_id}"
         if st.session_state.get(confirmation_key):
             st.warning(
