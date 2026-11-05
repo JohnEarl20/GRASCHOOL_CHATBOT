@@ -1080,16 +1080,24 @@ def render_chat() -> None:
                                 sender_name=student_name,
                                 audio=audio_raw,
                             )
+                        # Voice recordings cannot be transcribed (no speech-to-text),
+                        # so route them to staff who can listen and respond.
+                        try:
+                            conversation.update_conversation_status(
+                                st.session_state.conversation_id, "waiting"
+                            )
+                        except (OSError, PermissionError, ValueError):
+                            pass
                         st.session_state.messages.append(
                             {
                                 "role": "assistant",
                                 "text": (
                                     "🎙️ **Voice recording received and played back!** You can replay your audio above.\n\n"
-                                    "I answer questions that are **typed** into the AI Assistant - voice recordings are "
-                                    "played back but not transcribed.\n\n"
-                                    "Type your question below for an instant answer, "
-                                    "or say **\"ask staff\"** / **\"talk to staff\"** and I will connect you "
-                                    "to a registrar staff member right away."
+                                    "I answer questions that are **typed** into the AI Assistant - voice recordings "
+                                    "are played back but not transcribed.\n\n"
+                                    "Your voice recording has been sent to the staff queue. A registrar staff "
+                                    "member who is online can listen to it and reply. "
+                                    "Or type your question below for an instant answer."
                                 ),
                                 "timestamp": datetime.now().isoformat(timespec="seconds"),
                                 "meta": {
@@ -1098,6 +1106,7 @@ def render_chat() -> None:
                                     "source": "microphone - browser audio",
                                     "rules_fired": [],
                                     "facts": {},
+                                    "escalated": True,
                                 },
                                 "feedback": None,
                             }
@@ -1106,7 +1115,8 @@ def render_chat() -> None:
                             conversation.add_message(
                                 st.session_state.conversation_id,
                                 "assistant",
-                                "🎙️ Voice recording received and played back! Type your question for an instant answer, or say \"ask staff\" / \"talk to staff\" to be connected to a registrar staff member.",
+                                "🎙️ Voice recording received and played back! Your voice recording has been sent to the staff queue - a registrar staff member can listen and reply. Or type your question below for an instant answer.",
+                                meta={"intent": "voice_recording", "escalated": True},
                             )
                         st.rerun()
 
