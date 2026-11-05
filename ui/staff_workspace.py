@@ -1631,7 +1631,11 @@ def render_knowledge_base(audit_fn: Callable[[str, str], None]) -> None:
     if not _require_staff():
         return
     st.markdown("## Knowledge Base")
-    st.caption("New articles remain drafts until a staff member approves their school source. Only approved articles can be used by the assistant.")
+    st.caption(
+        "Articles are published to students as soon as they are saved with a "
+        "title, content, and school source. Use Approve to mark an article as "
+        "AI-verified, or Archive to remove it from student view."
+    )
     records = staff_content.load_articles()
     edit_options = {"Create a new draft": None}
     edit_options.update({
@@ -1651,7 +1655,7 @@ def render_knowledge_base(audit_fn: Callable[[str, str], None]) -> None:
         )
         source = st.text_input("School source / verification note", value=current.get("source", ""), max_chars=500)
         content = st.text_area("Official answer", value=current.get("content", ""), height=180, max_chars=12000)
-        submitted = st.form_submit_button("Save as draft", type="primary")
+        submitted = st.form_submit_button("Publish article", type="primary")
     if submitted:
         try:
             staff_content.save_article(
@@ -1662,20 +1666,20 @@ def render_knowledge_base(audit_fn: Callable[[str, str], None]) -> None:
         except (OSError, ValueError) as error:
             st.error(f"Could not save article: {error}")
         else:
-            audit_fn("Saved a knowledge article draft", auth.get_current_user_name() or auth.get_current_user_id() or "staff")
-            st.success("Draft saved.")
+            audit_fn("Published a knowledge article", auth.get_current_user_name() or auth.get_current_user_id() or "staff")
+            st.success("Article published and available to students.")
             st.rerun()
 
     if selected_id:
         button_col, archive_col = st.columns(2)
-        if button_col.button("Approve for AI answers", type="primary", key="staff_approve_article"):
+        if button_col.button("Mark as AI-verified", type="primary", key="staff_approve_article"):
             try:
                 staff_content.set_article_status(str(selected_id), "approved", auth.get_current_user_id() or "")
             except (OSError, ValueError) as error:
-                st.error(f"Could not approve article: {error}")
+                st.error(f"Could not mark article as AI-verified: {error}")
             else:
-                audit_fn("Approved a knowledge article", auth.get_current_user_name() or auth.get_current_user_id() or "staff")
-                st.success("Article approved and available to the assistant.")
+                audit_fn("Marked a knowledge article as AI-verified", auth.get_current_user_name() or auth.get_current_user_id() or "staff")
+                st.success("Article marked as AI-verified.")
                 st.rerun()
         if archive_col.button("Archive article", key="staff_archive_article"):
             try:

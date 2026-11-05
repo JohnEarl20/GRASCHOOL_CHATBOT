@@ -2058,7 +2058,7 @@ def render_student_knowledge() -> None:
         articles = [
             article
             for article in staff_content.load_articles()
-            if article.get("status") == "approved"
+            if article.get("status") in {"approved", "published"}
         ]
     except (OSError, ValueError) as error:
         st.error(f"Could not load the school knowledge base: {error}")

@@ -74,14 +74,13 @@ def save_article(
     if article_id and record is None:
         raise ValueError("Knowledge article no longer exists.")
     if record is None:
-        record = {"id": uuid.uuid4().hex, "created_at": now, "status": "draft"}
+        record = {"id": uuid.uuid4().hex, "created_at": now, "status": "published"}
         records.append(record)
     record.update(
         title=title,
         content=content,
         category=category,
         source=source,
-        status="draft",
         updated_at=now,
         updated_by=staff_id,
     )
