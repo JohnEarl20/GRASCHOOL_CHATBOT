@@ -237,7 +237,7 @@ def get_all_conversations() -> list[dict]:
     return conversations
 
 
-def add_message(session_id: str, role: str, text: str, sender_id: str | None = None, sender_name: str | None = None, meta: dict | None = None) -> dict | None:
+def add_message(session_id: str, role: str, text: str, sender_id: str | None = None, sender_name: str | None = None, meta: dict | None = None, audio: bytes | None = None) -> dict | None:
     """Append a role-authorized message to a conversation."""
     from code import auth
 
@@ -274,13 +274,15 @@ def add_message(session_id: str, role: str, text: str, sender_id: str | None = N
     now = _next_message_timestamp(conv)
     msg = {
         "id": uuid.uuid4().hex[:8],
-        "role": role,  # "student", "assistant", "staff"
+        "role": role,  # "student", "assistant", or "staff"
         "text": text,
         "sender_id": sender_id,
         "sender_name": sender_name,
         "timestamp": now,
         "meta": meta or {},
     }
+    if audio is not None:
+        msg["audio"] = audio
     conv["messages"].append(msg)
     conv["updated_at"] = now
 

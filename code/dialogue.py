@@ -389,6 +389,11 @@ def handle(text: str, session: Session, policy: "Policy | None" = None, student_
             source="conversation - fallback",
             answered=False,
         )
+        # Always offer to connect to staff when the AI cannot answer.
+        reply.text += (
+            "\n\nWould you like me to connect you to a registrar staff member? "
+            "Say 'ask staff' or 'talk to staff' and I will hand you over."
+        )
         if session.misses >= policy.misses_before_handoff:
             reply.text += "\n\n" + knowledge.handoff_note().text
             reply.escalated = True

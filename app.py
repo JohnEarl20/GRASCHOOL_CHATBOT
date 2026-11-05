@@ -1078,6 +1078,7 @@ def render_chat() -> None:
                                 "🎙️ [Voice Question Recorded]",
                                 sender_id=student_id,
                                 sender_name=student_name,
+                                audio=audio_raw,
                             )
                         st.session_state.messages.append(
                             {
@@ -1660,6 +1661,8 @@ def _render_staff_chat() -> None:
             with st.chat_message("user", avatar=student_profile_pic or "👤"):
                 st.markdown(f"**{sender_name or 'Student'}**")
                 st.markdown(text)
+                if msg.get("audio"):
+                    st.audio(msg["audio"], format="audio/wav")
                 if timestamp:
                     st.caption(timestamp[:19].replace('T', ' '))
         elif role == "staff":
