@@ -56,16 +56,23 @@ def _load_conversation(session_id: str) -> dict | None:
 
 
 def _save_conversation(conv: dict) -> None:
-    """Save a conversation atomically."""
+    """Save a conversation atomically.
+
+    Audio bytes are never stored in the JSON record - they live in separate
+    .wav files under data/conversations/audio/. Any ``audio`` key attached to
+    messages at load time (for playback) is stripped before serialization so
+    json.dumps never chokes on raw bytes.
+    """
     _ensure_dir()
     path = _conv_path(conv["session_id"])
+    clean = _strip_audio_bytes(conv)
     # Use a simpler approach for Windows compatibility
     try:
-        path.write_text(json.dumps(conv, ensure_ascii=False, indent=2), encoding="utf-8")
+        path.write_text(json.dumps(clean, ensure_ascii=False, indent=2), encoding="utf-8")
     except OSError:
         # Fallback: try with temp file
         tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(conv, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.write_text(json.dumps(clean, ensure_ascii=False, indent=2), encoding="utf-8")
         try:
             tmp.replace(path)
         except OSError:
@@ -73,6 +80,16 @@ def _save_conversation(conv: dict) -> None:
             if path.exists():
                 path.unlink()
             tmp.rename(path)
+
+
+def _strip_audio_bytes(conv: dict) -> dict:
+    """Return a deep copy of conv with ``audio`` bytes stripped from messages."""
+    import copy
+
+    clean = copy.deepcopy(conv)
+    for msg in clean.get("messages", []):
+        msg.pop("audio", None)
+    return clean
 
 
 def _next_message_timestamp(conv: dict) -> str:
