@@ -3,7 +3,7 @@
 # chrome and the custom cards stay in the same colour system.
 [server]
 headless = true
-maxUploadSize = 500
+maxUploadSize = 1024
 # Serves files under ./static/ at /app/static/<name>. The login wallpaper is
 # 1.9 MB; inlining it as a data URI would push 2.4 MB of base64 into the page
 # on every rerun, so it is served as a cacheable file instead.

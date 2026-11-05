@@ -16,8 +16,8 @@ ARTICLES_PATH = DATA_DIR / "knowledge_articles.json"
 ANNOUNCEMENTS_PATH = DATA_DIR / "staff_announcements.json"
 DOCUMENTS_PATH = DATA_DIR / "staff_documents.json"
 DOCUMENT_DIR = DATA_DIR / "staff_documents"
-ALLOWED_DOCUMENT_TYPES = {".csv", ".docx", ".pdf", ".txt", ".xlsx"}
-MAX_DOCUMENT_BYTES = 500 * 1024 * 1024
+MAX_DOCUMENT_BYTES = 1024 * 1024 * 1024
+_DOCUMENT_STORAGE_NAME = re.compile(r"[a-f0-9]{32}(\..+)?")
 ARTICLE_CATEGORIES = (
     "Enrollment",
     "Tuition and Fees",
@@ -205,8 +205,6 @@ def save_document(
 ) -> dict[str, Any]:
     original_name = Path(filename).name
     extension = Path(original_name).suffix.lower()
-    if extension not in ALLOWED_DOCUMENT_TYPES:
-        raise ValueError("Unsupported file type. Upload PDF, DOCX, TXT, CSV, or XLSX.")
     _validate_document_content(content)
     category = category.strip()
     if not category or len(category) > 80:
@@ -244,8 +242,6 @@ def replace_document(
         raise ValueError("Invalid document reference.")
     original_name = Path(filename).name
     extension = Path(original_name).suffix.lower()
-    if extension not in ALLOWED_DOCUMENT_TYPES:
-        raise ValueError("Unsupported file type. Upload PDF, DOCX, TXT, CSV, or XLSX.")
     _validate_document_content(content)
     category = category.strip()
     if not category or len(category) > 80:
@@ -256,7 +252,7 @@ def replace_document(
     if record is None:
         raise ValueError("Document no longer exists.")
     old_name = record.get("stored_name", "")
-    if not re.fullmatch(r"[a-f0-9]{32}\.(csv|docx|pdf|txt|xlsx)", old_name):
+    if not _DOCUMENT_STORAGE_NAME.fullmatch(old_name):
         raise ValueError("Invalid document storage reference.")
     stored_name = f"{uuid.uuid4().hex}{extension}"
     DOCUMENT_DIR.mkdir(parents=True, exist_ok=True)
@@ -285,7 +281,7 @@ def read_document(document_id: str) -> tuple[dict[str, Any], bytes]:
     if record is None:
         raise ValueError("Document no longer exists.")
     stored_name = record.get("stored_name", "")
-    if not re.fullmatch(r"[a-f0-9]{32}\.(csv|docx|pdf|txt|xlsx)", stored_name):
+    if not _DOCUMENT_STORAGE_NAME.fullmatch(stored_name):
         raise ValueError("Invalid document storage reference.")
     path = DOCUMENT_DIR / stored_name
     if not path.is_file():
@@ -360,7 +356,7 @@ def delete_document(document_id: str) -> bool:
     if record is None:
         return False
     stored_name = record.get("stored_name", "")
-    if not re.fullmatch(r"[a-f0-9]{32}\.(csv|docx|pdf|txt|xlsx)", stored_name):
+    if not _DOCUMENT_STORAGE_NAME.fullmatch(stored_name):
         raise ValueError("Invalid document storage reference.")
 
     _write_records(

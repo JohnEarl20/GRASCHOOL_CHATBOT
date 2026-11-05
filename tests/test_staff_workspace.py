@@ -1290,12 +1290,43 @@ class StaffWorkspaceStorageTests(unittest.TestCase):
             self.assertEqual(student_content, b"updated version")
 
     def test_document_upload_size_validation_distinguishes_empty_from_too_large(self) -> None:
-        self.assertEqual(staff_content.MAX_DOCUMENT_BYTES, 500 * 1024 * 1024)
+        self.assertEqual(staff_content.MAX_DOCUMENT_BYTES, 1024 * 1024 * 1024)
         with self.assertRaisesRegex(ValueError, "selected document is empty"):
             staff_content._validate_document_content(b"")
         with patch.object(staff_content, "MAX_DOCUMENT_BYTES", 3):
             with self.assertRaisesRegex(ValueError, "maximum allowed size is 0 MB"):
                 staff_content._validate_document_content(b"four")
+
+    def test_document_upload_accepts_any_file_type(self) -> None:
+        document_dir = self.root / "documents"
+        with (
+            patch.object(staff_content, "DATA_DIR", self.root),
+            patch.object(staff_content, "DOCUMENTS_PATH", self.root / "documents.json"),
+            patch.object(staff_content, "DOCUMENT_DIR", document_dir),
+        ):
+            for filename, content in (
+                ("enrollment-form.doc", b"legacy word document bytes"),
+                ("student-handbook.pdf", b"%PDF-1.4 fake pdf bytes"),
+                ("id-photo.jpg", b"\xff\xd8\xff fake jpeg bytes"),
+                ("requirements.zip", b"PK\x03\x04 fake zip bytes"),
+                ("readme", b"raw bytes without a file extension"),
+            ):
+                record = staff_content.save_document(
+                    filename,
+                    content,
+                    "Student Services",
+                    "staff-1",
+                    ["student-1"],
+                )
+                self.assertEqual(record["filename"], filename)
+                stored_path = document_dir / record["stored_name"]
+                self.assertTrue(stored_path.is_file())
+                stored_record, stored_content = staff_content.read_document(record["id"])
+                self.assertEqual(stored_content, content)
+                student_1_ids = [row["id"] for row in staff_content.documents_for_student("student-1")]
+                self.assertIn(record["id"], student_1_ids)
+                student_2_ids = [row["id"] for row in staff_content.documents_for_student("student-2")]
+                self.assertNotIn(record["id"], student_2_ids)
 
     def test_student_can_remove_only_their_own_shared_document_access(self) -> None:
         with (

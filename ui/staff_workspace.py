@@ -1701,8 +1701,8 @@ def render_documents(audit_fn: Callable[[str, str], None]) -> None:
         return
     st.markdown("## Document Management")
     st.caption(
-        "Upload documents and choose which student accounts can access them. "
-        "Unassigned documents remain staff-only. Supported: PDF, DOCX, TXT, CSV, XLSX (500 MB maximum)."
+        "Upload any file type and choose which student accounts can access them. "
+        "Unassigned documents remain staff-only. Maximum size: 1 GB per document."
     )
     try:
         users = auth._load_users()
@@ -1732,7 +1732,7 @@ def render_documents(audit_fn: Callable[[str, str], None]) -> None:
         if student_id in student_options
     ]
     with st.form("staff_document_upload", clear_on_submit=True):
-        upload = st.file_uploader("Choose a supporting document", type=["pdf", "docx", "txt", "csv", "xlsx"])
+        upload = st.file_uploader("Choose a supporting document")
         category = st.text_input("Category", max_chars=80, placeholder="For example: Enrollment")
         selected_students = st.multiselect(
             "Share with student(s)",
@@ -1808,7 +1808,7 @@ def render_documents(audit_fn: Callable[[str, str], None]) -> None:
         ".txt": "text/plain",
         ".csv": "text/csv",
         ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    }[Path(record["filename"]).suffix.lower()]
+    }.get(Path(record["filename"]).suffix.lower(), "application/octet-stream")
     st.download_button("Download selected document", data, record["filename"], mime, key="staff_document_download")
     if Path(record["filename"]).suffix.lower() == ".txt":
         st.text(data.decode("utf-8", errors="replace")[:12000])
