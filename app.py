@@ -848,6 +848,25 @@ def _poll_staff_response_timeout(conversation_id: str, student_id: str) -> None:
         st.rerun()
 
 
+@st.fragment(run_every=5)
+def _poll_student_messages(conversation_id: str, student_id: str) -> None:
+    """Poll for new staff or assistant messages in the student's conversation.
+
+    Keeps the student chat in sync with staff replies without requiring a
+    manual page refresh. Data is read from disk on every poll, so messages
+    survive logout and browser refresh.
+    """
+    if not conversation_id or not student_id:
+        return
+    conv = conversation.get_conversation(conversation_id)
+    if not conv or conv.get("student_id") != student_id:
+        return
+    messages = conv.get("messages", [])
+    if len(messages) != len(st.session_state.messages):
+        st.session_state.messages = messages
+        st.rerun()
+
+
 def render_chat() -> None:
     school = knowledge.load()["meta"]["school"]
     C.hero(
@@ -913,6 +932,10 @@ def render_chat() -> None:
     current_conversation = None
     if logged_in and auth.is_student() and st.session_state.conversation_id:
         current_conversation = conversation.get_conversation(st.session_state.conversation_id)
+        _poll_student_messages(
+            st.session_state.conversation_id,
+            student_id,
+        )
         if current_conversation and current_conversation.get("student_id") == student_id:
             status = current_conversation.get("status", "active")
             waiting_for_staff_reply = bool(current_conversation.get("waiting_since"))
@@ -1385,6 +1408,25 @@ def render_dashboard() -> None:
     staff_workspace.render(section, _log_audit, _render_staff_chat)
 
 
+def _poll_staff_messages() -> None:
+    """Poll for new student messages in the staff's selected conversation.
+
+    Keeps the staff chat in sync without requiring a manual page refresh,
+    so staff and student stay connected while both are online.
+    """
+    session_id = st.session_state.get("staff_conv_select")
+    if not session_id:
+        return
+    conv = conversation.get_conversation(session_id)
+    if not conv:
+        return
+    count_key = f"staff_msg_count_{session_id}"
+    current_count = st.session_state.get(count_key, 0)
+    if len(conv.get("messages", [])) > current_count:
+        st.session_state[count_key] = len(conv.get("messages", []))
+        st.rerun()
+
+
 def _render_staff_chat() -> None:
     """Real-time chat interface for staff to communicate with students."""
     heading = st.session_state.pop("staff_chat_heading", "Student Inquiries")
@@ -1460,6 +1502,7 @@ def _render_staff_chat() -> None:
     if not conv:
         st.error("Conversation not found")
         return
+    _poll_staff_messages()
 
     summary = conversation.get_conversation_summary(conv)
     
