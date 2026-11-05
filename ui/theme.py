@@ -1297,6 +1297,222 @@ div[data-testid="stHorizontalBlock"] .cca-cat-btn button {{
   .cca-brand-name {{ font-size: 0.95rem; }}
 }}
 
+/* ---------- mobile: phone & tablet ---------- */
+@media (max-width: 768px) {{
+  /* Sidebar: narrower, touch-friendly nav buttons */
+  [data-testid="stSidebar"],
+  [data-testid="stSidebarContent"],
+  [data-testid="stSidebar"] > div {{
+    width: 260px !important;
+    min-width: 260px !important;
+  }}
+  [data-testid="stSidebar"] .stButton > button {{
+    min-height: 48px !important;
+    padding: 10px 14px !important;
+    font-size: 0.95rem !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+  }}
+  [data-testid="stSidebar"] .stButton > button p {{
+    text-align: left !important;
+    width: 100% !important;
+    font-size: 0.95rem !important;
+  }}
+
+  /* Main content: full width, reduced padding */
+  [data-testid="stMainBlockContainer"] {{
+    padding: 4px 8px !important;
+    max-width: 100% !important;
+  }}
+
+  /* Chat bubbles: stack, word-wrap, narrower */
+  .cca-bubble {{
+    max-width: 92% !important;
+    padding: 10px 12px !important;
+    font-size: 0.9rem !important;
+    line-height: 1.55 !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }}
+  .cca-bubble-user {{ margin-left: auto !important; }}
+  .cca-bubble-bot {{ margin-right: auto !important; }}
+
+  /* Chat input: full width, touch-friendly */
+  [data-testid="stChatInput"] {{
+    min-height: 52px !important;
+    border-radius: 14px !important;
+    padding: 4px 8px !important;
+  }}
+  [data-testid="stChatInput"] textarea {{
+    min-height: 44px !important;
+    font-size: 1rem !important;
+  }}
+
+  /* Buttons: minimum 44px touch target */
+  .stButton > button, .stDownloadButton > button {{
+    min-height: 44px !important;
+    font-size: 0.95rem !important;
+    padding: 10px 16px !important;
+  }}
+  .stButton > button p, .stDownloadButton > button p {{
+    font-size: 0.95rem !important;
+  }}
+
+  /* Inputs: full width, larger touch targets */
+  [data-testid="stTextInput"] > div > div {{
+    min-height: 48px !important;
+    font-size: 1rem !important;
+  }}
+  [data-baseweb="select"] > div,
+  [data-baseweb="input"],
+  [data-baseweb="textarea"] {{
+    min-height: 48px !important;
+    font-size: 1rem !important;
+  }}
+
+  /* Cards: full width, reduced padding */
+  .cca-card, .cca-glass, .cca-futuristic-card {{
+    padding: 14px 16px !important;
+    margin: 0 4px 12px 4px !important;
+  }}
+  .cca-hero {{
+    padding: 16px 18px !important;
+    margin: 0 4px 12px 4px !important;
+  }}
+  .cca-hero h1 {{ font-size: 1.4rem !important; }}
+  .cca-hero p {{ font-size: 0.9rem !important; }}
+  .cca-login-card {{
+    padding: 18px 20px 6px 20px !important;
+    margin: 0 8px 12px 8px !important;
+  }}
+
+  /* KPI cards: smaller value text */
+  .cca-kpi {{
+    padding: 14px 16px !important;
+    margin: 0 4px 12px 4px !important;
+  }}
+  .cca-kpi-value {{ font-size: 1.4rem !important; }}
+  .cca-staff-kpi {{
+    padding: 12px 14px !important;
+    margin: 0 4px 10px 4px !important;
+    min-height: 100px !important;
+  }}
+  .cca-staff-kpi-value {{ font-size: 1.4rem !important; }}
+
+  /* Tables: horizontal scroll, smaller font */
+  table.cca-table {{ font-size: 0.8rem !important; }}
+  table.cca-table th, table.cca-table td {{
+    padding: 8px 10px !important;
+    white-space: nowrap !important;
+  }}
+  .cca-table-wrap {{
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }}
+  .cca-staff-table-wrap {{
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }}
+  .cca-staff-table {{
+    min-width: 600px !important;
+    font-size: 0.7rem !important;
+  }}
+  .cca-staff-table th, .cca-staff-table td {{
+    padding: 7px 6px !important;
+    white-space: nowrap !important;
+  }}
+
+  /* Expanders and forms */
+  [data-testid="stExpander"] {{
+    margin: 0 4px 12px 4px !important;
+  }}
+  .stForm {{
+    margin: 0 4px 12px 4px !important;
+  }}
+
+  /* Developer grid: single column */
+  .cca-dev-grid {{
+    grid-template-columns: 1fr !important;
+  }}
+  .cca-dev-card {{
+    padding: 18px 16px !important;
+  }}
+
+  /* Tabs: horizontal scroll */
+  [data-baseweb="tab-list"] {{
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    white-space: nowrap !important;
+  }}
+  [data-baseweb="tab"] {{
+    padding: 6px 12px !important;
+    font-size: 0.85rem !important;
+    white-space: nowrap !important;
+  }}
+
+  /* Badges: smaller */
+  .cca-badge {{
+    font-size: 0.68rem !important;
+    padding: 2px 9px !important;
+  }}
+
+  /* Section headings */
+  .cca-staff-section-heading,
+  .cca-nav-label {{
+    font-size: 0.85rem !important;
+    margin: 12px 8px 6px 8px !important;
+  }}
+
+  /* Staff quick actions: full-width buttons */
+  .st-key-staff-quick-actions button {{
+    min-height: 48px !important;
+    font-size: 0.85rem !important;
+    padding: 10px 14px !important;
+  }}
+
+  /* Document upload dropzone */
+  [data-testid="stFileUploaderDropzone"] {{
+    min-height: 100px !important;
+    padding: 16px !important;
+  }}
+
+  /* Audio players: full width */
+  audio {{ width: 100% !important; }}
+
+  /* Hide heavy decorative aurora on mobile */
+  .cca-login-aurora {{ opacity: 0.4 !important; }}
+}}
+
+@media (max-width: 480px) {{
+  /* Phone: tighter still */
+  [data-testid="stSidebar"] {{
+    width: 240px !important;
+    min-width: 240px !important;
+  }}
+  [data-testid="stMainBlockContainer"] {{
+    padding: 2px 6px !important;
+  }}
+  .cca-bubble {{
+    max-width: 95% !important;
+    padding: 8px 10px !important;
+    font-size: 0.85rem !important;
+  }}
+  .cca-hero h1 {{ font-size: 1.25rem !important; }}
+  .cca-kpi-value {{ font-size: 1.25rem !important; }}
+  .cca-staff-kpi-value {{ font-size: 1.25rem !important; }}
+  .stButton > button, .stDownloadButton > button {{
+    min-height: 48px !important;
+    font-size: 0.9rem !important;
+    padding: 10px 14px !important;
+  }}
+  [data-testid="stTextInput"] > div > div {{
+    min-height: 46px !important;
+    font-size: 0.95rem !important;
+  }}
+  .cca-banner-title {{ font-size: 1.7rem !important; }}
+  .cca-banner-sub {{ font-size: 0.95rem !important; }}
+}}
+
 @media (prefers-reduced-motion: reduce) {{
   *, *::before, *::after {{
     transition-duration: 0.01ms !important;
