@@ -17,26 +17,42 @@ from code import staff_presence
 
 ROOT = Path(__file__).resolve().parent.parent
 CONV_DIR = ROOT / "data" / "conversations"
+AUDIO_DIR = CONV_DIR / "audio"
 STAFF_RESPONSE_TIMEOUT_SECONDS = 5
 
 
 def _ensure_dir() -> None:
     CONV_DIR.mkdir(parents=True, exist_ok=True)
+    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _conv_path(session_id: str) -> Path:
     return CONV_DIR / f"{session_id}.json"
 
 
+def _audio_path(message_id: str) -> Path:
+    return AUDIO_DIR / f"{message_id}.wav"
+
+
 def _load_conversation(session_id: str) -> dict | None:
-    """Load a conversation by session_id."""
+    """Load a conversation by session_id, attaching stored audio bytes to messages."""
     path = _conv_path(session_id)
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        conv = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
+    for msg in conv.get("messages", []):
+        audio_file = msg.get("audio_file")
+        if audio_file:
+            apath = _audio_path(audio_file)
+            if apath.exists():
+                try:
+                    msg["audio"] = apath.read_bytes()
+                except OSError:
+                    pass
+    return conv
 
 
 def _save_conversation(conv: dict) -> None:
@@ -282,7 +298,12 @@ def add_message(session_id: str, role: str, text: str, sender_id: str | None = N
         "meta": meta or {},
     }
     if audio is not None:
-        msg["audio"] = audio
+        audio_filename = f"{msg['id']}.wav"
+        try:
+            _audio_path(audio_filename).write_bytes(audio)
+        except OSError:
+            pass
+        msg["audio_file"] = audio_filename
     conv["messages"].append(msg)
     conv["updated_at"] = now
 
