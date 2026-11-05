@@ -1085,8 +1085,11 @@ def render_chat() -> None:
                                 "role": "assistant",
                                 "text": (
                                     "🎙️ **Voice recording received and played back!** You can replay your audio above.\n\n"
-                                    "💡 *Tip: Our cognitive handbook rules provide instant verified answers for typed queries. "
-                                    "Type your question in the text box below to view your confidence score, official requirements, and eligibility rules.*"
+                                    "I answer questions that are **typed** into the AI Assistant - voice recordings are "
+                                    "played back but not transcribed.\n\n"
+                                    "Type your question below for an instant answer, "
+                                    "or say **\"ask staff\"** / **\"talk to staff\"** and I will connect you "
+                                    "to a registrar staff member right away."
                                 ),
                                 "timestamp": datetime.now().isoformat(timespec="seconds"),
                                 "meta": {
@@ -1103,7 +1106,7 @@ def render_chat() -> None:
                             conversation.add_message(
                                 st.session_state.conversation_id,
                                 "assistant",
-                                "🎙️ Voice recording received and played back!",
+                                "🎙️ Voice recording received and played back! Type your question for an instant answer, or say \"ask staff\" / \"talk to staff\" to be connected to a registrar staff member.",
                             )
                         st.rerun()
 
